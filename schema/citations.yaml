@@ -1,0 +1,405 @@
+id: https://w3id.org/dandi/citations-collector
+name: citations-collector
+title: Citations Collector Schema
+description: >-
+  Schema for tracking scholarly citations of digital products (datasets, software,
+  tools) identified by DOIs, RRIDs, or other identifiers. Supports flexible
+  hierarchical collections and curation workflows.
+license: MIT
+version: 0.2.0
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  citations: https://w3id.org/dandi/citations-collector/
+  schema: http://schema.org/
+  datacite: https://purl.org/datacite/v4.4/
+
+default_prefix: citations
+default_range: string
+
+imports:
+  - linkml:types
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+enums:
+  RefType:
+    description: Type of identifier reference.
+    permissible_values:
+      doi:
+        description: Digital Object Identifier (version-specific).
+      rrid:
+        description: Research Resource Identifier (SciCrunch).
+      arxiv:
+        description: arXiv preprint identifier.
+      pmid:
+        description: PubMed identifier.
+      pmcid:
+        description: PubMed Central identifier.
+      url:
+        description: Generic URL (fallback when no persistent ID available).
+      zenodo_concept:
+        description: >-
+          Zenodo concept DOI or parent.id representing ALL versions.
+          Example: "10.5281/zenodo.1012598" or just "1012598".
+          System will auto-discover all version DOIs via Zenodo API
+          (query: parent.id:1012598&f=allversions:true).
+      zenodo_version:
+        description: Zenodo version-specific record ID (resolves to DOI).
+      github:
+        description: GitHub repository (owner/repo format).
+
+  CitationRelationship:
+    description: The relationship between a citing work and the cited item.
+    permissible_values:
+      Cites:
+        description: The work explicitly cites the item in its references.
+      IsDocumentedBy:
+        description: The item is documented by this work (e.g., a data descriptor).
+      Describes:
+        description: The work describes the item or its creation methodology.
+      IsSupplementedBy:
+        description: The item is supplemented by this work.
+      References:
+        description: The work references the item without formal citation.
+      Uses:
+        description: The work uses data/code from the item.
+      IsDerivedFrom:
+        description: The work is derived from the item.
+
+  CitationType:
+    description: The type of citing work.
+    permissible_values:
+      Publication:
+        description: Peer-reviewed journal article or conference paper.
+      Preprint:
+        description: Non-peer-reviewed preprint (bioRxiv, arXiv, etc.).
+      Protocol:
+        description: Published protocol (protocols.io, etc.).
+      Thesis:
+        description: Doctoral or master's thesis.
+      Book:
+        description: Book or book chapter.
+      Software:
+        description: Software package or tool.
+      Dataset:
+        description: Another dataset that cites this one.
+      Other:
+        description: Other type of work.
+
+  CitationSource:
+    description: The source from which the citation was discovered.
+    permissible_values:
+      crossref:
+        description: Discovered via CrossRef cited-by API.
+      opencitations:
+        description: Discovered via OpenCitations (OCI) API.
+      datacite:
+        description: Discovered via DataCite API.
+      europepmc:
+        description: Discovered via Europe PMC API.
+      semantic_scholar:
+        description: Discovered via Semantic Scholar API.
+      scicrunch:
+        description: Discovered via SciCrunch/RRID API.
+      manual:
+        description: Manually added by curator.
+
+  CitationStatus:
+    description: Curation status of the citation.
+    permissible_values:
+      active:
+        description: Citation is valid and should be included.
+      ignored:
+        description: Citation is a false positive and should be excluded.
+      merged:
+        description: Citation has been merged into another (e.g., preprint → published).
+      pending:
+        description: Citation needs review by curator.
+
+# =============================================================================
+# Classes
+# =============================================================================
+
+classes:
+
+  # ---------------------------------------------------------------------------
+  # Item Reference - a single resolvable identifier for an item
+  # ---------------------------------------------------------------------------
+  ItemRef:
+    description: >-
+      A resolvable identifier for an item (DOI, RRID, URL, etc.).
+      An item may have multiple refs (e.g., both RRID and Zenodo DOI).
+    attributes:
+      ref_type:
+        description: Type of identifier.
+        range: RefType
+        required: true
+      ref_value:
+        description: >-
+          The identifier value. Format depends on ref_type:
+          - doi: "10.1234/example" (without doi: prefix)
+          - rrid: "SCR_016216" (without RRID: prefix)
+          - arxiv: "2301.12345"
+          - pmid: "12345678"
+          - url: full URL
+          - zenodo: record ID like "852659"
+          - github: "owner/repo"
+        required: true
+      ref_url:
+        description: Resolved URL for this reference (auto-populated).
+
+  # ---------------------------------------------------------------------------
+  # Item Flavor - a version or variant of an item
+  # ---------------------------------------------------------------------------
+  ItemFlavor:
+    description: >-
+      A specific version or variant of an item. For versioned resources
+      (software releases, dataset versions), each version is a flavor.
+      For unversioned resources, use a single flavor (e.g., "latest" or "main").
+    attributes:
+      flavor_id:
+        description: >-
+          Identifier for this flavor (e.g., "0.210812.1448", "23.1.0", "latest").
+          Use "main" or omit for unversioned items.
+        required: true
+        identifier: true
+      name:
+        description: Human-readable name for this flavor.
+      release_date:
+        description: When this flavor was released (ISO 8601).
+        range: date
+      refs:
+        description: >-
+          Resolvable identifiers for this flavor. Multiple refs allowed
+          (e.g., both DOI and RRID for the same version).
+        range: ItemRef
+        multivalued: true
+        inlined_as_list: true
+        required: true
+      citations:
+        description: Citations discovered for this flavor.
+        range: CitationRecord
+        multivalued: true
+        inlined_as_list: true
+
+  # ---------------------------------------------------------------------------
+  # Item - a tracked resource (dataset, tool, software)
+  # ---------------------------------------------------------------------------
+  Item:
+    description: >-
+      A tracked resource with one or more flavors (versions). The item_id
+      can encode hierarchy using ":" separator (e.g., "dandi:000003",
+      "repronim:fmriprep", or just "my-tool").
+    attributes:
+      item_id:
+        description: >-
+          Unique identifier for this item within the collection.
+          May include namespace prefix with ":" (e.g., "dandi:000003").
+          The part before ":" indicates the source/project.
+        required: true
+        identifier: true
+      name:
+        description: Human-readable name.
+      description:
+        description: Description of the item.
+      homepage:
+        description: URL to the item's homepage or landing page.
+      flavors:
+        description: Versions/variants of this item.
+        range: ItemFlavor
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+  # ---------------------------------------------------------------------------
+  # Citation Record - a single citation relationship
+  # ---------------------------------------------------------------------------
+  CitationRecord:
+    description: >-
+      A record representing a citation relationship between a citing work
+      and a tracked item. Each row in the citations TSV.
+    attributes:
+      # What is being cited (the tracked item)
+      item_id:
+        description: ID of the tracked item being cited.
+        required: true
+      item_flavor:
+        description: Flavor (version) of the item being cited.
+        required: true
+      item_ref_type:
+        description: Which ref type was matched for this citation.
+        range: RefType
+      item_ref_value:
+        description: Which ref value was matched for this citation.
+      item_name:
+        description: Human-readable name of the item (for display).
+
+      # The citing work
+      citation_doi:
+        description: DOI of the citing work (primary identifier).
+        pattern: "^10\\..+/.+$"
+      citation_pmid:
+        description: PubMed ID of the citing work.
+      citation_arxiv:
+        description: arXiv ID of the citing work.
+      citation_url:
+        description: URL to the citing work (fallback if no DOI).
+      citation_title:
+        description: Title of the citing work.
+      citation_authors:
+        description: Authors of the citing work (semicolon-separated).
+      citation_year:
+        description: Publication year of the citing work.
+        range: integer
+      citation_journal:
+        description: Journal or venue of the citing work.
+
+      # Relationship metadata
+      citation_relationship:
+        description: How the citing work relates to the item.
+        range: CitationRelationship
+        required: true
+      citation_type:
+        description: Type of the citing work.
+        range: CitationType
+
+      # Provenance
+      citation_source:
+        description: Where this citation was discovered.
+        range: CitationSource
+        required: true
+      discovered_date:
+        description: When this citation was first discovered (ISO 8601).
+        range: date
+
+      # Curation
+      citation_status:
+        description: Curation status.
+        range: CitationStatus
+        required: true
+        ifabsent: "string(active)"
+      citation_merged_into:
+        description: >-
+          If status is 'merged', the DOI of the canonical version
+          (e.g., published paper DOI when this is a preprint).
+        pattern: "^10\\..+/.+$"
+      citation_comment:
+        description: Curator notes about this citation.
+      curated_by:
+        description: Who made the curation decision.
+      curated_date:
+        description: When the curation decision was made (ISO 8601).
+        range: date
+
+    unique_keys:
+      citation_item_key:
+        description: >-
+          Unique key: each citing work (by DOI or URL) is unique per item+flavor.
+        unique_key_slots:
+          - item_id
+          - item_flavor
+          - citation_doi
+
+  # ---------------------------------------------------------------------------
+  # Collection - the root container
+  # ---------------------------------------------------------------------------
+  Collection:
+    description: >-
+      A collection of tracked items. This is the root object that gets
+      serialized to collection.yaml.
+    tree_root: true
+    attributes:
+      name:
+        description: Name of the collection (e.g., "DANDI", "ReproNim Tools").
+        required: true
+      description:
+        description: Description of the collection.
+      homepage:
+        description: URL to the collection homepage.
+      maintainers:
+        description: List of maintainer names or emails.
+        multivalued: true
+      source_type:
+        description: >-
+          Hint for auto-import: "dandi", "zenodo_org", "zenodo_collection",
+          "github_org", "yaml", etc.
+      source_config:
+        description: Configuration for auto-import (JSON string or nested object).
+
+      # Zotero integration
+      zotero_group_id:
+        description: Zotero group ID for syncing.
+        range: integer
+      zotero_collection_key:
+        description: Zotero parent collection key.
+
+      # Content
+      items:
+        description: Items in this collection.
+        range: Item
+        multivalued: true
+        inlined_as_list: true
+
+      # Metadata
+      created_date:
+        description: When this collection was created.
+        range: date
+      last_updated:
+        description: When the collection was last updated.
+        range: datetime
+
+  # ---------------------------------------------------------------------------
+  # Curation Rules
+  # ---------------------------------------------------------------------------
+  CurationRule:
+    description: A rule for automatic curation.
+    attributes:
+      rule_id:
+        description: Unique identifier for this rule.
+        required: true
+        identifier: true
+      rule_type:
+        description: >-
+          Type of rule: "ignore_doi_prefix", "ignore_doi", "merge_preprint",
+          "auto_merge_preprint", "flag_for_review".
+        required: true
+      pattern:
+        description: Pattern to match (DOI prefix, regex, etc.).
+        required: true
+      action:
+        description: Action to take (ignore, merge, flag).
+        required: true
+      target:
+        description: Target for merge actions.
+      comment:
+        description: Explanation of why this rule exists.
+      created_by:
+        description: Who created this rule.
+      created_date:
+        description: When this rule was created.
+        range: date
+
+  CurationConfig:
+    description: Configuration for automatic curation.
+    attributes:
+      rules:
+        description: Curation rules to apply automatically.
+        range: CurationRule
+        multivalued: true
+        inlined_as_list: true
+      preprint_doi_prefixes:
+        description: >-
+          DOI prefixes that indicate preprints. Default: 10.1101 (bioRxiv),
+          10.21203 (Research Square), 10.2139 (SSRN).
+        multivalued: true
+      ignored_doi_prefixes:
+        description: DOI prefixes to always ignore.
+        multivalued: true
+      auto_merge_preprints:
+        description: >-
+          If true, automatically merge preprints when published version
+          is found citing the same item.
+        range: boolean

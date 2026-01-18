@@ -1,0 +1,131 @@
+# Example: ReproNim Tools Collection
+# Software tools and resources with multiple identifier types (RRID + DOI)
+# See https://repronim.org for more information
+
+name: ReproNim Tools
+description: Reproducible neuroimaging tools and resources from ReproNim
+homepage: https://repronim.org
+source_type: yaml
+maintainers:
+  - ReproNim Team
+
+items:
+  # --- Data Management ---
+  - item_id: datalad
+    name: DataLad
+    description: Distributed data management system
+    homepage: https://www.datalad.org
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: rrid
+            ref_value: SCR_003931
+          # Use zenodo_concept to auto-discover all version DOIs
+          - ref_type: zenodo_concept
+            ref_value: "808846"  # parent.id from 10.5281/zenodo.808846
+          - ref_type: github
+            ref_value: datalad/datalad
+
+  - item_id: datalad-container
+    name: DataLad Container Extension
+    description: DataLad extension for working with containerized environments
+    homepage: https://github.com/datalad/datalad-container
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: github
+            ref_value: datalad/datalad-container
+          - ref_type: doi
+            ref_value: "10.5281/zenodo.1317904"
+
+  # --- Containers & Reproducibility ---
+  - item_id: repronim-containers
+    name: ReproNim Containers
+    description: Singularity container images for neuroimaging
+    homepage: https://github.com/ReproNim/containers
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: github
+            ref_value: ReproNim/containers
+
+  - item_id: con-duct
+    name: con/duct
+    description: Lightweight wrapper to collect execution environment metadata
+    homepage: https://github.com/con/duct
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: github
+            ref_value: con/duct
+
+  # --- DICOM/BIDS Conversion ---
+  - item_id: heudiconv
+    name: HeuDiConv
+    description: Flexible DICOM converter for organizing brain imaging data into BIDS
+    homepage: https://heudiconv.readthedocs.io
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: rrid
+            ref_value: SCR_017427
+          - ref_type: github
+            ref_value: nipy/heudiconv
+          - ref_type: doi
+            ref_value: "10.21105/joss.05839"  # JOSS paper
+          # Zenodo concept DOI - system will auto-discover all version DOIs
+          # via query: parent.id:1012598&f=allversions:true
+          - ref_type: zenodo_concept
+            ref_value: "1012598"  # or "10.5281/zenodo.1012598"
+
+  - item_id: reproin
+    name: ReproIn
+    description: HeuDiConv heuristic for turnkey BIDS conversion
+    homepage: https://github.com/ReproNim/reproin
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: github
+            ref_value: ReproNim/reproin
+
+  # --- Workflows ---
+  - item_id: nipype
+    name: Nipype
+    description: Workflows and interfaces for neuroimaging packages
+    homepage: https://nipype.readthedocs.io
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: rrid
+            ref_value: SCR_002502
+          - ref_type: github
+            ref_value: nipy/nipype
+          - ref_type: doi
+            ref_value: "10.3389/fninf.2011.00013"  # Original publication
+
+  # --- Standards & Schemas ---
+  - item_id: reproschema
+    name: ReproSchema
+    description: Standardized form generation and data collection schema
+    homepage: https://github.com/ReproNim/reproschema
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: rrid
+            ref_value: SCR_017405
+          - ref_type: github
+            ref_value: ReproNim/reproschema
+          - ref_type: doi
+            ref_value: "10.2196/63343"  # JMIR publication 2025
+
+  - item_id: open-brain-consent
+    name: Open Brain Consent
+    description: Templates for consent forms for brain imaging data sharing (GDPR-compliant)
+    homepage: https://open-brain-consent.readthedocs.io
+    flavors:
+      - flavor_id: latest
+        refs:
+          - ref_type: github
+            ref_value: con/open-brain-consent
+          - ref_type: doi
+            ref_value: "10.1002/hbm.25351"  # Human Brain Mapping publication

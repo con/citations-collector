@@ -1,0 +1,118 @@
+# Example: GitHub Actions workflow for automated citation updates
+# Place this in .github/workflows/update-citations.yaml in your citations repo
+
+name: Update Citations
+
+on:
+  # Run weekly on Sundays at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * 0'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      full_refresh:
+        description: 'Force full refresh (ignore incremental)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  update-citations:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Need full history for proper commits
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install citations-collector
+        run: |
+          pip install citations-collector
+
+      - name: Discover new citations
+        env:
+          # Optional: Set email for CrossRef Polite pool (better rate limits)
+          CROSSREF_EMAIL: ${{ secrets.CROSSREF_EMAIL }}
+          # Optional: Zotero API key for sync
+          ZOTERO_API_KEY: ${{ secrets.ZOTERO_API_KEY }}
+        run: |
+          # Run discovery with incremental mode (uses last_updated from collection)
+          ARGS=""
+          if [ "${{ github.event.inputs.full_refresh }}" == "true" ]; then
+            ARGS="--full-refresh"
+          fi
+
+          citations-collector discover collection.yaml $ARGS \
+            --output citations.tsv \
+            --log-file discovery.log
+
+      - name: Check for changes
+        id: check_changes
+        run: |
+          if git diff --quiet citations.tsv; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No new citations found"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            # Count new citations
+            NEW_COUNT=$(git diff --numstat citations.tsv | awk '{print $1}')
+            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
+            echo "Found approximately $NEW_COUNT new citation records"
+          fi
+
+      - name: Commit changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Stage changes
+          git add citations.tsv collection.yaml
+
+          # Create commit message with summary
+          DATE=$(date -u +"%Y-%m-%d")
+          git commit -m "Update citations ($DATE)
+
+          - Discovered ~${{ steps.check_changes.outputs.new_count }} new citation records
+          - Run type: ${{ github.event.inputs.full_refresh == 'true' && 'full refresh' || 'incremental' }}
+
+          🤖 Automated by citations-collector"
+
+      - name: Push changes
+        if: steps.check_changes.outputs.changed == 'true'
+        run: |
+          git push
+
+      - name: Sync to Zotero (optional)
+        if: steps.check_changes.outputs.changed == 'true' && env.ZOTERO_API_KEY != ''
+        env:
+          ZOTERO_API_KEY: ${{ secrets.ZOTERO_API_KEY }}
+        run: |
+          citations-collector sync-zotero collection.yaml \
+            --api-key "$ZOTERO_API_KEY"
+
+      - name: Upload logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: discovery-logs
+          path: discovery.log
+          retention-days: 30
+
+      - name: Summary
+        run: |
+          echo "## Citation Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check_changes.outputs.changed }}" == "true" ]; then
+            echo "✅ Found ~${{ steps.check_changes.outputs.new_count }} new citations" >> $GITHUB_STEP_SUMMARY
+            echo "📝 Changes committed and pushed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No new citations found" >> $GITHUB_STEP_SUMMARY
+          fi
