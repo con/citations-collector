@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import csv
+from contextlib import suppress
 from pathlib import Path
 
 from citations_collector.models import CitationRecord
-
 
 # TSV column order matching examples/citations-example.tsv
 TSV_COLUMNS = [
@@ -59,13 +59,11 @@ def load_citations(path: Path) -> list[CitationRecord]:
 
             # Convert year to int if present
             if cleaned.get("citation_year"):
-                try:
-                    cleaned["citation_year"] = int(cleaned["citation_year"])
-                except ValueError:
-                    pass
+                with suppress(ValueError):
+                    cleaned["citation_year"] = int(cleaned["citation_year"])  # type: ignore[arg-type]
 
             # Create CitationRecord, only including fields that are in the model
-            citation = CitationRecord(**cleaned)
+            citation = CitationRecord(**cleaned)  # type: ignore[arg-type]
             citations.append(citation)
 
     return citations

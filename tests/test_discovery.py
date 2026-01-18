@@ -140,7 +140,7 @@ def test_incremental_date_filtering() -> None:
 
     # Discover with since parameter
     since = datetime(2024, 1, 1)
-    citations = discoverer.discover(item_ref, since=since)
+    discoverer.discover(item_ref, since=since)
 
     # Should have called API with date filter
     assert len(responses.calls) == 1

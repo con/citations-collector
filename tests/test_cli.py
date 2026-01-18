@@ -72,7 +72,9 @@ def test_discover_full_refresh_flag(collections_dir: Path, tmp_path: Path) -> No
 
 
 @pytest.mark.ai_generated
-def test_discover_email_env_var(collections_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_discover_email_env_var(
+    collections_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test discover respects CROSSREF_EMAIL environment variable."""
     monkeypatch.setenv("CROSSREF_EMAIL", "test@example.org")
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
-from citations_collector.models import CitationRecord, Collection
 from citations_collector.persistence import tsv_io, yaml_io
 
 
@@ -98,7 +98,7 @@ items:
     )
 
     # Should raise validation error
-    with pytest.raises(Exception):  # Pydantic ValidationError
+    with pytest.raises(ValidationError):
         yaml_io.load_collection(yaml_file)
 
 

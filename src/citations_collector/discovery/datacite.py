@@ -22,9 +22,7 @@ class DataCiteDiscoverer(AbstractDiscoverer):
         """Initialize DataCite discoverer."""
         self.session = requests.Session()
 
-    def discover(
-        self, item_ref: ItemRef, since: datetime | None = None
-    ) -> list[CitationRecord]:
+    def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """
         Discover citations from DataCite.
 

@@ -12,9 +12,7 @@ class AbstractDiscoverer(ABC):
     """Base class for citation discovery APIs."""
 
     @abstractmethod
-    def discover(
-        self, item_ref: ItemRef, since: datetime | None = None
-    ) -> list[CitationRecord]:
+    def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """
         Discover citations for a given item reference.
 

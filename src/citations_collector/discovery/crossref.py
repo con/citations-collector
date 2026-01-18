@@ -30,9 +30,7 @@ class CrossRefDiscoverer(AbstractDiscoverer):
         if email:
             self.session.headers["User-Agent"] = f"citations-collector (mailto:{email})"
 
-    def discover(
-        self, item_ref: ItemRef, since: datetime | None = None
-    ) -> list[CitationRecord]:
+    def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """
         Discover citations from CrossRef.
 
@@ -106,9 +104,9 @@ class CrossRefDiscoverer(AbstractDiscoverer):
                 citation_authors=author_str,
                 citation_year=year,
                 citation_journal=journal,
-                citation_relationship="Cites",
+                citation_relationship="Cites",  # type: ignore[arg-type]
                 citation_source=CitationSource("crossref"),
-                citation_status="active",
+                citation_status="active",  # type: ignore[arg-type]
             )
             citations.append(citation)
 

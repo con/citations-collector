@@ -64,7 +64,7 @@ class CitationCollector:
             sources = ["crossref", "opencitations"]
 
         # Initialize discoverers
-        discoverers = []
+        discoverers: list[tuple[str, CrossRefDiscoverer | OpenCitationsDiscoverer]] = []
         if "crossref" in sources:
             discoverers.append(("crossref", CrossRefDiscoverer(email=email)))
         if "opencitations" in sources:
@@ -77,6 +77,9 @@ class CitationCollector:
 
         # Discover citations for all items/flavors/refs
         all_citations = []
+
+        if not self.collection.items:
+            return
 
         for item in self.collection.items:
             for flavor in item.flavors:
@@ -132,9 +135,7 @@ class CitationCollector:
             new_citations: New citations to merge
         """
         # Build index of existing citations
-        existing_index = {
-            (c.item_id, c.item_flavor, c.citation_doi): c for c in self.citations
-        }
+        existing_index = {(c.item_id, c.item_flavor, c.citation_doi): c for c in self.citations}
 
         # Merge new citations
         for new_citation in new_citations:

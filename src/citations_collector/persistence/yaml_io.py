@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
-from pydantic import ValidationError
 
 from citations_collector.models import Collection
 
@@ -27,10 +26,7 @@ def load_collection(path: Path) -> Collection:
     with open(path) as f:
         data = yaml.safe_load(f)
 
-    try:
-        return Collection(**data)
-    except ValidationError as e:
-        raise ValidationError(f"Invalid collection schema in {path}: {e}") from e
+    return Collection(**data)
 
 
 def save_collection(collection: Collection, path: Path) -> None:

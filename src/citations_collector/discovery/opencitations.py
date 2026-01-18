@@ -22,9 +22,7 @@ class OpenCitationsDiscoverer(AbstractDiscoverer):
         """Initialize OpenCitations discoverer."""
         self.session = requests.Session()
 
-    def discover(
-        self, item_ref: ItemRef, since: datetime | None = None
-    ) -> list[CitationRecord]:
+    def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """
         Discover citations from OpenCitations.
 
@@ -70,9 +68,9 @@ class OpenCitationsDiscoverer(AbstractDiscoverer):
                 item_id="",  # Will be filled by caller
                 item_flavor="",  # Will be filled by caller
                 citation_doi=citing_doi,
-                citation_relationship="Cites",
+                citation_relationship="Cites",  # type: ignore[arg-type]
                 citation_source=CitationSource("opencitations"),
-                citation_status="active",
+                citation_status="active",  # type: ignore[arg-type]
             )
             citations.append(citation)
 

@@ -8,7 +8,6 @@ import pytest
 import responses
 
 from citations_collector.core import CitationCollector
-from citations_collector.models import Collection
 
 
 @pytest.mark.ai_generated
@@ -29,14 +28,18 @@ def test_discover_all_with_mocks(collections_dir: Path) -> None:
     responses.add(
         responses.GET,
         "https://api.crossref.org/works/10.1234/test.dataset",
-        json={"message": {"reference": [
-            {
-                "DOI": "10.1234/citing.paper",
-                "title": ["Test citation"],
-                "author": [{"given": "John", "family": "Doe"}],
-                "published": {"date-parts": [[2024]]},
+        json={
+            "message": {
+                "reference": [
+                    {
+                        "DOI": "10.1234/citing.paper",
+                        "title": ["Test citation"],
+                        "author": [{"given": "John", "family": "Doe"}],
+                        "published": {"date-parts": [[2024]]},
+                    }
+                ]
             }
-        ]}},
+        },
         status=200,
     )
 
