@@ -1,10 +1,11 @@
 name: Simple Test Collection
 description: Minimal collection for unit testing
 items:
-  - item_id: test-item
-    name: "Test Dataset"
-    flavors:
-      - flavor_id: "1.0.0"
-        refs:
-          - ref_type: doi
-            ref_value: "10.1234/test.dataset"
+- item_id: test-item
+  name: Test Dataset
+  flavors:
+  - flavor_id: 1.0.0
+    refs:
+    - ref_type: doi
+      ref_value: 10.1234/test.dataset
+last_updated: 2026-01-18 17:14:04.887096
