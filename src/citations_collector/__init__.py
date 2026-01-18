@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+from citations_collector.core import CitationCollector
+from citations_collector.models import CitationRecord, Collection
+
 __all__ = [
     "__version__",
+    "CitationCollector",
+    "CitationRecord",
+    "Collection",
 ]
 
 try:
