@@ -1,0 +1,2 @@
+item_id	item_flavor	item_ref_type	item_ref_value	item_name	citation_doi	citation_title	citation_authors	citation_year	citation_journal	citation_relationship	citation_type	citation_source	discovered_date	citation_status
+test-item	1.0.0	doi	10.1234/test.dataset	Test Dataset	10.1234/citing.paper	A paper citing our dataset	Smith J; Jones A	2024	Test Journal	Cites	Publication	crossref	2024-01-15	active
