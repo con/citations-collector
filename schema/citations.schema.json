@@ -1,0 +1,638 @@
+{
+    "$defs": {
+        "CitationRecord": {
+            "additionalProperties": false,
+            "description": "A record representing a citation relationship between a citing work and a tracked item. Each row in the citations TSV.",
+            "properties": {
+                "citation_arxiv": {
+                    "description": "arXiv ID of the citing work.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_authors": {
+                    "description": "Authors of the citing work (semicolon-separated).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_comment": {
+                    "description": "Curator notes about this citation.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_doi": {
+                    "description": "DOI of the citing work (primary identifier).",
+                    "pattern": "^10\\..+/.+$",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_journal": {
+                    "description": "Journal or venue of the citing work.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_merged_into": {
+                    "description": "If status is 'merged', the DOI of the canonical version (e.g., published paper DOI when this is a preprint).",
+                    "pattern": "^10\\..+/.+$",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_pmid": {
+                    "description": "PubMed ID of the citing work.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_relationship": {
+                    "$ref": "#/$defs/CitationRelationship",
+                    "description": "How the citing work relates to the item."
+                },
+                "citation_source": {
+                    "$ref": "#/$defs/CitationSource",
+                    "description": "Where this citation was discovered."
+                },
+                "citation_status": {
+                    "$ref": "#/$defs/CitationStatus",
+                    "description": "Curation status."
+                },
+                "citation_title": {
+                    "description": "Title of the citing work.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_type": {
+                    "$ref": "#/$defs/CitationType",
+                    "description": "Type of the citing work."
+                },
+                "citation_url": {
+                    "description": "URL to the citing work (fallback if no DOI).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "citation_year": {
+                    "description": "Publication year of the citing work.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "curated_by": {
+                    "description": "Who made the curation decision.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "curated_date": {
+                    "description": "When the curation decision was made (ISO 8601).",
+                    "format": "date",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "discovered_date": {
+                    "description": "When this citation was first discovered (ISO 8601).",
+                    "format": "date",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "item_flavor": {
+                    "description": "Flavor (version) of the item being cited.",
+                    "type": "string"
+                },
+                "item_id": {
+                    "description": "ID of the tracked item being cited.",
+                    "type": "string"
+                },
+                "item_name": {
+                    "description": "Human-readable name of the item (for display).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "item_ref_type": {
+                    "$ref": "#/$defs/RefType",
+                    "description": "Which ref type was matched for this citation."
+                },
+                "item_ref_value": {
+                    "description": "Which ref value was matched for this citation.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "item_id",
+                "item_flavor",
+                "citation_relationship",
+                "citation_source",
+                "citation_status"
+            ],
+            "title": "CitationRecord",
+            "type": "object"
+        },
+        "CitationRelationship": {
+            "description": "The relationship between a citing work and the cited item.",
+            "enum": [
+                "Cites",
+                "IsDocumentedBy",
+                "Describes",
+                "IsSupplementedBy",
+                "References",
+                "Uses",
+                "IsDerivedFrom"
+            ],
+            "title": "CitationRelationship",
+            "type": "string"
+        },
+        "CitationSource": {
+            "description": "The source from which the citation was discovered.",
+            "enum": [
+                "crossref",
+                "opencitations",
+                "datacite",
+                "europepmc",
+                "semantic_scholar",
+                "scicrunch",
+                "manual"
+            ],
+            "title": "CitationSource",
+            "type": "string"
+        },
+        "CitationStatus": {
+            "description": "Curation status of the citation.",
+            "enum": [
+                "active",
+                "ignored",
+                "merged",
+                "pending"
+            ],
+            "title": "CitationStatus",
+            "type": "string"
+        },
+        "CitationType": {
+            "description": "The type of citing work.",
+            "enum": [
+                "Publication",
+                "Preprint",
+                "Protocol",
+                "Thesis",
+                "Book",
+                "Software",
+                "Dataset",
+                "Other"
+            ],
+            "title": "CitationType",
+            "type": "string"
+        },
+        "Collection": {
+            "additionalProperties": false,
+            "description": "A collection of tracked items. This is the root object that gets serialized to collection.yaml.",
+            "properties": {
+                "created_date": {
+                    "description": "When this collection was created.",
+                    "format": "date",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "description": {
+                    "description": "Description of the collection.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "homepage": {
+                    "description": "URL to the collection homepage.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "items": {
+                    "description": "Items in this collection.",
+                    "items": {
+                        "$ref": "#/$defs/Item"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "last_updated": {
+                    "description": "When the collection was last updated.",
+                    "format": "date-time",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "maintainers": {
+                    "description": "List of maintainer names or emails.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "name": {
+                    "description": "Name of the collection (e.g., \"DANDI\", \"ReproNim Tools\").",
+                    "type": "string"
+                },
+                "source_config": {
+                    "description": "Configuration for auto-import (JSON string or nested object).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "source_type": {
+                    "description": "Hint for auto-import: \"dandi\", \"zenodo_org\", \"zenodo_collection\", \"github_org\", \"yaml\", etc.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "zotero_collection_key": {
+                    "description": "Zotero parent collection key.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "zotero_group_id": {
+                    "description": "Zotero group ID for syncing.",
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "name"
+            ],
+            "title": "Collection",
+            "type": "object"
+        },
+        "CurationConfig": {
+            "additionalProperties": false,
+            "description": "Configuration for automatic curation.",
+            "properties": {
+                "auto_merge_preprints": {
+                    "description": "If true, automatically merge preprints when published version is found citing the same item.",
+                    "type": [
+                        "boolean",
+                        "null"
+                    ]
+                },
+                "ignored_doi_prefixes": {
+                    "description": "DOI prefixes to always ignore.",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "preprint_doi_prefixes": {
+                    "description": "DOI prefixes that indicate preprints. Default: 10.1101 (bioRxiv), 10.21203 (Research Square), 10.2139 (SSRN).",
+                    "items": {
+                        "type": "string"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "rules": {
+                    "description": "Curation rules to apply automatically.",
+                    "items": {
+                        "$ref": "#/$defs/CurationRule"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                }
+            },
+            "title": "CurationConfig",
+            "type": "object"
+        },
+        "CurationRule": {
+            "additionalProperties": false,
+            "description": "A rule for automatic curation.",
+            "properties": {
+                "action": {
+                    "description": "Action to take (ignore, merge, flag).",
+                    "type": "string"
+                },
+                "comment": {
+                    "description": "Explanation of why this rule exists.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "created_by": {
+                    "description": "Who created this rule.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "created_date": {
+                    "description": "When this rule was created.",
+                    "format": "date",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "pattern": {
+                    "description": "Pattern to match (DOI prefix, regex, etc.).",
+                    "type": "string"
+                },
+                "rule_id": {
+                    "description": "Unique identifier for this rule.",
+                    "type": "string"
+                },
+                "rule_type": {
+                    "description": "Type of rule: \"ignore_doi_prefix\", \"ignore_doi\", \"merge_preprint\", \"auto_merge_preprint\", \"flag_for_review\".",
+                    "type": "string"
+                },
+                "target": {
+                    "description": "Target for merge actions.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "rule_id",
+                "rule_type",
+                "pattern",
+                "action"
+            ],
+            "title": "CurationRule",
+            "type": "object"
+        },
+        "Item": {
+            "additionalProperties": false,
+            "description": "A tracked resource with one or more flavors (versions). The item_id can encode hierarchy using \":\" separator (e.g., \"dandi:000003\", \"repronim:fmriprep\", or just \"my-tool\").",
+            "properties": {
+                "description": {
+                    "description": "Description of the item.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "flavors": {
+                    "description": "Versions/variants of this item.",
+                    "items": {
+                        "$ref": "#/$defs/ItemFlavor"
+                    },
+                    "type": "array"
+                },
+                "homepage": {
+                    "description": "URL to the item's homepage or landing page.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "item_id": {
+                    "description": "Unique identifier for this item within the collection. May include namespace prefix with \":\" (e.g., \"dandi:000003\"). The part before \":\" indicates the source/project.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Human-readable name.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "item_id",
+                "flavors"
+            ],
+            "title": "Item",
+            "type": "object"
+        },
+        "ItemFlavor": {
+            "additionalProperties": false,
+            "description": "A specific version or variant of an item. For versioned resources (software releases, dataset versions), each version is a flavor. For unversioned resources, use a single flavor (e.g., \"latest\" or \"main\").",
+            "properties": {
+                "citations": {
+                    "description": "Citations discovered for this flavor.",
+                    "items": {
+                        "$ref": "#/$defs/CitationRecord"
+                    },
+                    "type": [
+                        "array",
+                        "null"
+                    ]
+                },
+                "flavor_id": {
+                    "description": "Identifier for this flavor (e.g., \"0.210812.1448\", \"23.1.0\", \"latest\"). Use \"main\" or omit for unversioned items.",
+                    "type": "string"
+                },
+                "name": {
+                    "description": "Human-readable name for this flavor.",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "refs": {
+                    "description": "Resolvable identifiers for this flavor. Multiple refs allowed (e.g., both DOI and RRID for the same version).",
+                    "items": {
+                        "$ref": "#/$defs/ItemRef"
+                    },
+                    "type": "array"
+                },
+                "release_date": {
+                    "description": "When this flavor was released (ISO 8601).",
+                    "format": "date",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                }
+            },
+            "required": [
+                "flavor_id",
+                "refs"
+            ],
+            "title": "ItemFlavor",
+            "type": "object"
+        },
+        "ItemRef": {
+            "additionalProperties": false,
+            "description": "A resolvable identifier for an item (DOI, RRID, URL, etc.). An item may have multiple refs (e.g., both RRID and Zenodo DOI).",
+            "properties": {
+                "ref_type": {
+                    "$ref": "#/$defs/RefType",
+                    "description": "Type of identifier."
+                },
+                "ref_url": {
+                    "description": "Resolved URL for this reference (auto-populated).",
+                    "type": [
+                        "string",
+                        "null"
+                    ]
+                },
+                "ref_value": {
+                    "description": "The identifier value. Format depends on ref_type: - doi: \"10.1234/example\" (without doi: prefix) - rrid: \"SCR_016216\" (without RRID: prefix) - arxiv: \"2301.12345\" - pmid: \"12345678\" - url: full URL - zenodo: record ID like \"852659\" - github: \"owner/repo\"",
+                    "type": "string"
+                }
+            },
+            "required": [
+                "ref_type",
+                "ref_value"
+            ],
+            "title": "ItemRef",
+            "type": "object"
+        },
+        "RefType": {
+            "description": "Type of identifier reference.",
+            "enum": [
+                "doi",
+                "rrid",
+                "arxiv",
+                "pmid",
+                "pmcid",
+                "url",
+                "zenodo_concept",
+                "zenodo_version",
+                "github"
+            ],
+            "title": "RefType",
+            "type": "string"
+        }
+    },
+    "$id": "https://w3id.org/dandi/citations-collector",
+    "$schema": "https://json-schema.org/draft/2019-09/schema",
+    "additionalProperties": true,
+    "description": "A collection of tracked items. This is the root object that gets serialized to collection.yaml.",
+    "metamodel_version": "1.7.0",
+    "properties": {
+        "created_date": {
+            "description": "When this collection was created.",
+            "format": "date",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "description": {
+            "description": "Description of the collection.",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "homepage": {
+            "description": "URL to the collection homepage.",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "items": {
+            "description": "Items in this collection.",
+            "items": {
+                "$ref": "#/$defs/Item"
+            },
+            "type": [
+                "array",
+                "null"
+            ]
+        },
+        "last_updated": {
+            "description": "When the collection was last updated.",
+            "format": "date-time",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "maintainers": {
+            "description": "List of maintainer names or emails.",
+            "items": {
+                "type": "string"
+            },
+            "type": [
+                "array",
+                "null"
+            ]
+        },
+        "name": {
+            "description": "Name of the collection (e.g., \"DANDI\", \"ReproNim Tools\").",
+            "type": "string"
+        },
+        "source_config": {
+            "description": "Configuration for auto-import (JSON string or nested object).",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "source_type": {
+            "description": "Hint for auto-import: \"dandi\", \"zenodo_org\", \"zenodo_collection\", \"github_org\", \"yaml\", etc.",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "zotero_collection_key": {
+            "description": "Zotero parent collection key.",
+            "type": [
+                "string",
+                "null"
+            ]
+        },
+        "zotero_group_id": {
+            "description": "Zotero group ID for syncing.",
+            "type": [
+                "integer",
+                "null"
+            ]
+        }
+    },
+    "required": [
+        "name"
+    ],
+    "title": "citations-collector",
+    "type": "object",
+    "version": "0.2.0"
+}
+

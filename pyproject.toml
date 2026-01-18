@@ -1,0 +1,117 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "citations-collector"
+dynamic = ["version"]
+description = "Discover and curate scholarly citations of datasets and software"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "DANDI", email = "team@dandiarchive.org" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "click>=8.0",
+    "requests>=2.28",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "pyzotero>=1.5",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-timeout>=2.0",
+    "responses>=0.23",
+]
+devel = [
+    "citations-collector[test]",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+    "types-requests",
+    "types-pyyaml",
+    "tox>=4.0",
+    "tox-uv>=1.0",
+]
+ci = [
+    "citations-collector[devel]",
+    "tox-gh-actions>=3.0",
+]
+linkml = [
+    "linkml>=1.7.0",
+    "linkml-runtime>=1.7.0",
+]
+
+[project.scripts]
+citations-collector = "citations_collector.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/dandi/citations-collector"
+Repository = "https://github.com/dandi/citations-collector"
+Issues = "https://github.com/dandi/citations-collector/issues"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/citations_collector/_version.py"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/schema",
+    "/examples",
+    "/tests",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = ["src/citations_collector/models/generated.py", "src/citations_collector/_version.py"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["citations_collector"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/citations_collector/models/generated.py" = ["E501", "UP", "F401", "I001"]
+"src/citations_collector/_version.py" = ["E501", "UP", "I001"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+files = ["src/citations_collector"]
+
+[[tool.mypy.overrides]]
+module = [
+    "pyzotero.*",
+    "linkml_runtime.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "citations_collector.models.generated",
+    "citations_collector._version",
+]
+disallow_untyped_defs = false
+warn_return_any = false
+disable_error_code = ["arg-type", "no-any-return", "no-untyped-def"]
