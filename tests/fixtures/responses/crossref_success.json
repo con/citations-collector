@@ -1,0 +1,29 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.1234/test.dataset",
+    "is-referenced-by-count": 2,
+    "reference": [
+      {
+        "DOI": "10.1234/citing.paper1",
+        "title": ["First paper citing our dataset"],
+        "author": [
+          {"given": "John", "family": "Smith"},
+          {"given": "Alice", "family": "Jones"}
+        ],
+        "published": {"date-parts": [[2024, 1, 15]]},
+        "container-title": ["Journal of Test Research"]
+      },
+      {
+        "DOI": "10.1234/citing.paper2",
+        "title": ["Second paper citing our dataset"],
+        "author": [
+          {"given": "Bob", "family": "Wilson"}
+        ],
+        "published": {"date-parts": [[2023, 6, 10]]},
+        "container-title": ["Test Science"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "citing": "10.1234/citing.paper3",
+    "cited": "10.1234/test.dataset",
+    "creation": "2024-02-01",
+    "timespan": "P1Y"
+  }
+]
