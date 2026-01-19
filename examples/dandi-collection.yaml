@@ -1,35 +1,32 @@
-# Example: DANDI Archive dandisets
-# Hierarchical structure with namespaced item_ids and versioned flavors
-
 name: DANDI Archive
 description: Neural data archive with versioned dandisets
 homepage: https://dandiarchive.org
 source_type: dandi
 zotero_group_id: 5774211
 zotero_collection_key: UHK47FKX
-
 items:
-  - item_id: "dandi:000003"
-    name: "Physiological Properties and Behavioral Correlates of Hippocampal Granule Cells and Mossy Cells"
-    homepage: https://dandiarchive.org/dandiset/000003
-    flavors:
-      - flavor_id: "0.210812.1448"
-        release_date: 2021-08-12
-        refs:
-          - ref_type: doi
-            ref_value: "10.48324/dandi.000003/0.210812.1448"
-      - flavor_id: "0.220126.1853"
-        release_date: 2022-01-26
-        refs:
-          - ref_type: doi
-            ref_value: "10.48324/dandi.000003/0.220126.1853"
-
-  - item_id: "dandi:000005"
-    name: "Electrophysiology data from thalamic and cortical neurons during somatosensation"
-    homepage: https://dandiarchive.org/dandiset/000005
-    flavors:
-      - flavor_id: "0.210812.1500"
-        release_date: 2021-08-12
-        refs:
-          - ref_type: doi
-            ref_value: "10.48324/dandi.000005/0.210812.1500"
+- item_id: dandi:000003
+  name: Physiological Properties and Behavioral Correlates of Hippocampal Granule
+    Cells and Mossy Cells
+  homepage: https://dandiarchive.org/dandiset/000003
+  flavors:
+  - flavor_id: 0.210812.1448
+    release_date: 2021-08-12
+    refs:
+    - ref_type: doi
+      ref_value: 10.48324/dandi.000003/0.210812.1448
+  - flavor_id: 0.220126.1853
+    release_date: 2022-01-26
+    refs:
+    - ref_type: doi
+      ref_value: 10.48324/dandi.000003/0.220126.1853
+- item_id: dandi:000005
+  name: Electrophysiology data from thalamic and cortical neurons during somatosensation
+  homepage: https://dandiarchive.org/dandiset/000005
+  flavors:
+  - flavor_id: 0.210812.1500
+    release_date: 2021-08-12
+    refs:
+    - ref_type: doi
+      ref_value: 10.48324/dandi.000005/0.210812.1500
+last_updated: 2026-01-18 20:32:04.382687

@@ -6,7 +6,11 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from citations_collector.discovery import CrossRefDiscoverer, OpenCitationsDiscoverer
+from citations_collector.discovery import (
+    CrossRefDiscoverer,
+    DataCiteDiscoverer,
+    OpenCitationsDiscoverer,
+)
 from citations_collector.discovery.utils import deduplicate_citations
 from citations_collector.models import CitationRecord, Collection
 from citations_collector.persistence import tsv_io, yaml_io
@@ -57,6 +61,7 @@ class CitationCollector:
 
         Args:
             sources: Which discoverers to use (default: ["crossref", "opencitations"])
+                     Available: "crossref", "opencitations", "datacite"
             incremental: Use last_updated for date filtering
             email: Email for CrossRef polite pool
         """
@@ -64,11 +69,15 @@ class CitationCollector:
             sources = ["crossref", "opencitations"]
 
         # Initialize discoverers
-        discoverers: list[tuple[str, CrossRefDiscoverer | OpenCitationsDiscoverer]] = []
+        discoverers: list[
+            tuple[str, CrossRefDiscoverer | OpenCitationsDiscoverer | DataCiteDiscoverer]
+        ] = []
         if "crossref" in sources:
             discoverers.append(("crossref", CrossRefDiscoverer(email=email)))
         if "opencitations" in sources:
             discoverers.append(("opencitations", OpenCitationsDiscoverer()))
+        if "datacite" in sources:
+            discoverers.append(("datacite", DataCiteDiscoverer()))
 
         # Determine since date for incremental
         since = None

@@ -1,0 +1,35 @@
+{
+  "data": [
+    {
+      "id": "event-1",
+      "type": "events",
+      "attributes": {
+        "obj-id": "https://doi.org/10.48324/dandi.000003/0.210812.1448",
+        "relation-type-id": "is-referenced-by",
+        "occurred-at": "2022-03-15T10:30:00Z",
+        "subj": {
+          "pid": "https://doi.org/10.1016/j.neuron.2022.01.001",
+          "title": "Hippocampal replay of extended experience",
+          "published": "2022"
+        }
+      }
+    },
+    {
+      "id": "event-2",
+      "type": "events",
+      "attributes": {
+        "obj-id": "https://doi.org/10.48324/dandi.000003/0.210812.1448",
+        "relation-type-id": "is-referenced-by",
+        "occurred-at": "2023-05-20T14:22:00Z",
+        "subj": {
+          "pid": "https://doi.org/10.1038/s41593-023-01234-5",
+          "title": "Neural mechanisms of memory consolidation",
+          "published": "2023"
+        }
+      }
+    }
+  ],
+  "meta": {
+    "total": 2
+  }
+}

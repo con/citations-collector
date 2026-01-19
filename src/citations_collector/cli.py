@@ -45,8 +45,8 @@ def main(verbose: bool) -> None:
 @click.option(
     "--sources",
     multiple=True,
-    type=click.Choice(["crossref", "opencitations"]),
-    help="Which sources to query (default: both)",
+    type=click.Choice(["crossref", "opencitations", "datacite"]),
+    help="Which sources to query (default: crossref+opencitations)",
 )
 def discover(
     collection: Path,

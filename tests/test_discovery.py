@@ -9,7 +9,11 @@ from pathlib import Path
 import pytest
 import responses
 
-from citations_collector.discovery import CrossRefDiscoverer, OpenCitationsDiscoverer
+from citations_collector.discovery import (
+    CrossRefDiscoverer,
+    DataCiteDiscoverer,
+    OpenCitationsDiscoverer,
+)
 from citations_collector.discovery.utils import deduplicate_citations
 from citations_collector.models import ItemRef
 
@@ -187,3 +191,93 @@ def test_deduplication_across_sources() -> None:
     assert len(unique) == 2
     dois = {c.citation_doi for c in unique}
     assert dois == {"10.1234/paper", "10.1234/different"}
+
+
+@pytest.mark.ai_generated
+@responses.activate
+def test_datacite_success(responses_dir: Path) -> None:
+    """Test successful citation discovery from DataCite Event Data."""
+    # Load mock response
+    with open(responses_dir / "datacite_success.json") as f:
+        mock_data = json.load(f)
+
+    # Mock DataCite Event Data API
+    responses.add(
+        responses.GET,
+        "https://api.datacite.org/events",
+        json=mock_data,
+        status=200,
+    )
+
+    # Create discoverer and item ref
+    discoverer = DataCiteDiscoverer()
+    item_ref = ItemRef(ref_type="doi", ref_value="10.48324/dandi.000003/0.210812.1448")
+
+    # Discover citations
+    citations = discoverer.discover(item_ref)
+
+    # Verify results
+    assert len(citations) == 2
+    assert citations[0].citation_doi == "10.1016/j.neuron.2022.01.001"
+    assert citations[0].citation_source == "datacite"
+    assert citations[0].citation_title == "Hippocampal replay of extended experience"
+    assert citations[0].citation_year == 2022
+    assert citations[1].citation_doi == "10.1038/s41593-023-01234-5"
+
+
+@pytest.mark.ai_generated
+@responses.activate
+def test_datacite_empty_results(responses_dir: Path) -> None:
+    """Test DataCite with no citations."""
+    # Load mock response
+    with open(responses_dir / "datacite_empty.json") as f:
+        mock_data = json.load(f)
+
+    # Mock DataCite Event Data API
+    responses.add(
+        responses.GET,
+        "https://api.datacite.org/events",
+        json=mock_data,
+        status=200,
+    )
+
+    # Create discoverer
+    discoverer = DataCiteDiscoverer()
+    item_ref = ItemRef(ref_type="doi", ref_value="10.48324/dandi.000005/0.210812.1500")
+
+    # Discover citations
+    citations = discoverer.discover(item_ref)
+
+    # Should return empty list, not error
+    assert citations == []
+
+
+@pytest.mark.ai_generated
+@responses.activate
+def test_datacite_network_error() -> None:
+    """Test DataCite graceful degradation on network error."""
+    # Mock network error
+    responses.add(
+        responses.GET,
+        "https://api.datacite.org/events",
+        status=500,
+    )
+
+    # Create discoverer
+    discoverer = DataCiteDiscoverer()
+    item_ref = ItemRef(ref_type="doi", ref_value="10.48324/dandi.000003/0.210812.1448")
+
+    # Should return empty list, not raise
+    citations = discoverer.discover(item_ref)
+    assert citations == []
+
+
+@pytest.mark.ai_generated
+def test_datacite_non_doi_ref() -> None:
+    """Test DataCite with non-DOI reference type."""
+    discoverer = DataCiteDiscoverer()
+    item_ref = ItemRef(ref_type="github", ref_value="dandi/dandi-cli")
+
+    # Should return empty list and log warning
+    citations = discoverer.discover(item_ref)
+    assert citations == []
