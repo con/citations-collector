@@ -48,18 +48,29 @@ def main(verbose: bool) -> None:
     type=click.Choice(["crossref", "opencitations", "datacite"]),
     help="Which sources to query (default: crossref+opencitations)",
 )
+@click.option(
+    "--expand-refs",
+    is_flag=True,
+    help="Expand non-DOI refs (zenodo_concept, github) to DOIs before discovery",
+)
 def discover(
     collection: Path,
     output: Path,
     full_refresh: bool,
     email: str | None,
     sources: tuple[str, ...],
+    expand_refs: bool,
 ) -> None:
     """Discover citations for all items in COLLECTION."""
     click.echo(f"Loading collection from {collection}")
 
     # Load collection
     collector = CitationCollector.from_yaml(collection)
+
+    # Expand non-DOI refs if requested
+    if expand_refs:
+        click.echo("Expanding non-DOI references (zenodo_concept, github) to DOIs...")
+        collector.expand_refs()
 
     # Load existing citations if TSV exists
     if output.exists():

@@ -50,6 +50,58 @@ class CitationCollector:
         collection = yaml_io.load_collection(path)
         return cls(collection)
 
+    def expand_refs(
+        self, github_token: str | None = None, expand_types: list[str] | None = None
+    ) -> None:
+        """
+        Expand non-DOI references to DOI references.
+
+        This pre-processes the collection to convert references like:
+        - zenodo_concept → multiple DOI refs (concept + all versions)
+        - github → DOI ref (via Zenodo badge extraction)
+
+        Expanded DOIs are added to the item's refs list alongside original refs.
+
+        Args:
+            github_token: Optional GitHub token for API rate limits
+            expand_types: Which ref types to expand (default: ["zenodo_concept", "github"])
+        """
+        from citations_collector.importers import GitHubMapper, ZenodoExpander
+
+        if expand_types is None:
+            expand_types = ["zenodo_concept", "github"]
+
+        if not self.collection.items:
+            return
+
+        # Initialize expanders/mappers
+        zenodo_expander = ZenodoExpander() if "zenodo_concept" in expand_types else None
+        github_mapper = (
+            GitHubMapper(github_token=github_token) if "github" in expand_types else None
+        )
+
+        for item in self.collection.items:
+            for flavor in item.flavors:
+                # Collect expanded refs
+                expanded_refs = []
+
+                for ref in flavor.refs:
+                    # Expand zenodo_concept to all version DOIs
+                    if ref.ref_type == "zenodo_concept" and zenodo_expander:
+                        logger.info(f"Expanding Zenodo concept {ref.ref_value} for {item.item_id}")
+                        doi_refs = zenodo_expander.expand(ref.ref_value)
+                        expanded_refs.extend(doi_refs)
+
+                    # Map github to Zenodo DOI
+                    elif ref.ref_type == "github" and github_mapper:
+                        logger.info(f"Mapping GitHub {ref.ref_value} to DOI for {item.item_id}")
+                        doi_ref = github_mapper.map_to_doi(ref.ref_value)
+                        if doi_ref:
+                            expanded_refs.append(doi_ref)
+
+                # Add expanded refs to flavor
+                flavor.refs.extend(expanded_refs)
+
     def discover_all(
         self,
         sources: list[str] | None = None,
