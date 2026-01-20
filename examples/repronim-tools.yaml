@@ -18,6 +18,8 @@ items:
       ref_value: '808846'
     - ref_type: github
       ref_value: datalad/datalad
+    - ref_type: doi
+      ref_value: 10.5281/zenodo.808846
 - item_id: datalad-container
   name: DataLad Container Extension
   description: DataLad extension for working with containerized environments
@@ -29,6 +31,8 @@ items:
       ref_value: datalad/datalad-container
     - ref_type: doi
       ref_value: 10.5281/zenodo.1317904
+    - ref_type: doi
+      ref_value: 10.5281/zenodo.3368666
 - item_id: repronim-containers
   name: ReproNim Containers
   description: Singularity container images for neuroimaging
@@ -62,6 +66,8 @@ items:
       ref_value: 10.21105/joss.05839
     - ref_type: zenodo_concept
       ref_value: '1012598'
+    - ref_type: doi
+      ref_value: 10.5281/zenodo.1012598
 - item_id: reproin
   name: ReproIn
   description: HeuDiConv heuristic for turnkey BIDS conversion
@@ -84,6 +90,8 @@ items:
       ref_value: nipy/nipype
     - ref_type: doi
       ref_value: 10.3389/fninf.2011.00013
+    - ref_type: doi
+      ref_value: 10.5281/zenodo.596855
 - item_id: reproschema
   name: ReproSchema
   description: Standardized form generation and data collection schema
@@ -97,6 +105,8 @@ items:
       ref_value: ReproNim/reproschema
     - ref_type: doi
       ref_value: 10.2196/63343
+    - ref_type: doi
+      ref_value: 10.5281/zenodo.4064940
 - item_id: open-brain-consent
   name: Open Brain Consent
   description: Templates for consent forms for brain imaging data sharing (GDPR-compliant)
@@ -108,4 +118,6 @@ items:
       ref_value: con/open-brain-consent
     - ref_type: doi
       ref_value: 10.1002/hbm.25351
-last_updated: 2026-01-18 20:16:36.316997
+    - ref_type: doi
+      ref_value: 10.5281/zenodo.3403176
+last_updated: 2026-01-20 13:55:55.635539

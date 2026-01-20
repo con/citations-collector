@@ -43,9 +43,7 @@ def test_repronim_collection_with_expansion() -> None:
 
     # Count original refs
     original_ref_count = sum(
-        len(flavor.refs)
-        for item in collector.collection.items
-        for flavor in item.flavors
+        len(flavor.refs) for item in collector.collection.items for flavor in item.flavors
     )
     print(f"\nOriginal refs: {original_ref_count}")
 
@@ -55,9 +53,7 @@ def test_repronim_collection_with_expansion() -> None:
 
     # Count refs after expansion
     expanded_ref_count = sum(
-        len(flavor.refs)
-        for item in collector.collection.items
-        for flavor in item.flavors
+        len(flavor.refs) for item in collector.collection.items for flavor in item.flavors
     )
     print(f"After expansion: {expanded_ref_count}")
 
@@ -115,9 +111,7 @@ def test_dandi_collection_with_datacite() -> None:
 
     # Count total refs
     total_refs = sum(
-        len(flavor.refs)
-        for item in collector.collection.items
-        for flavor in item.flavors
+        len(flavor.refs) for item in collector.collection.items for flavor in item.flavors
     )
     print(f"\nTotal DANDI DOI refs: {total_refs}")
 
@@ -133,9 +127,7 @@ def test_dandi_collection_with_datacite() -> None:
 
     # The important thing is that the workflow completes without errors
     # and the API calls succeed (even if they return no citations)
-    assert (
-        collector.citations is not None
-    ), "Citations list should be initialized (even if empty)"
+    assert collector.citations is not None, "Citations list should be initialized (even if empty)"
 
     # If citations were found, verify structure
     if collector.citations:

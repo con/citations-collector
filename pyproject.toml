@@ -46,6 +46,7 @@ devel = [
     "types-pyyaml",
     "tox>=4.0",
     "tox-uv>=1.0",
+    "pre-commit>=3.0",
 ]
 ci = [
     "citations-collector[devel]",

@@ -413,4 +413,3 @@ CitationRecord.model_rebuild()
 Collection.model_rebuild()
 CurationRule.model_rebuild()
 CurationConfig.model_rebuild()
-
