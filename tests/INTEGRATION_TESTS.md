@@ -41,7 +41,8 @@ pytest -m integration -v
 pytest tests/test_integration.py -v
 ```
 
-**Result**: Runs 6 integration tests with live API calls (~20 seconds)
+**Result**: Runs 5-6 integration tests with live API calls (~10-20 seconds)
+- May skip test_zenodo_expansion_real_concept if Zenodo returns 403
 
 ### Run All Tests (Unit + Integration)
 ```bash
@@ -52,7 +53,9 @@ tox -e all
 pytest -v
 ```
 
-**Result**: Runs all 38 tests (~22 seconds)
+**Result**: Runs 37-38 tests (~10-22 seconds)
+- 32 unit tests always pass
+- 5-6 integration tests (may skip Zenodo test)
 
 ## Integration Test Coverage
 
@@ -95,9 +98,12 @@ pytest -v
 - Tests Zenodo concept expansion in isolation
 - Uses DataLad concept ID (808846)
 - Validates expansion to 25+ version DOIs
+- **May be skipped**: If Zenodo returns 403 Forbidden (rate limiting/blocking)
 
 **APIs Called**:
 - Zenodo API
+
+**Note**: Zenodo API frequently returns 403 Forbidden due to rate limiting or blocking. When this happens, the test is skipped rather than failing. This is an acceptable failure mode.
 
 ### 5. GitHub Mapping Real Repo
 **Test**: `test_github_mapping_real_repo`
@@ -179,19 +185,24 @@ If running GitHub integration tests in CI, consider:
 
 ### Expected Results
 - **Unit tests**: Should always pass (deterministic, mocked)
-- **Integration tests**: May occasionally fail due to:
+- **Integration tests**: May occasionally be skipped or fail due to:
   - Network connectivity issues
   - External API downtime
-  - Rate limiting (especially GitHub)
+  - Rate limiting (especially GitHub, Zenodo)
   - Data coverage (e.g., DataCite may have no citations for some DOIs)
 
-### Acceptable Failures
-Some integration tests are designed to handle empty results gracefully:
-- DANDI DataCite test may find 0 citations (Event Data coverage incomplete)
-- GitHub mapper may fail if rate limited
-- Any test may fail if external service is temporarily down
+### Acceptable Failures and Skips
+Some integration tests are designed to handle failures gracefully:
+- **Zenodo expansion test**: Skipped if Zenodo returns 403 Forbidden (rate limiting)
+- **DANDI DataCite test**: May find 0 citations (Event Data coverage incomplete)
+- **GitHub mapper test**: May return no DOI if rate limited
 
-These are not test failures - they validate graceful degradation.
+**Expected test results**:
+- All 6 tests pass: Ideal case when all APIs are responsive
+- 5 pass, 1 skipped: Normal when Zenodo blocks API (test_zenodo_expansion_real_concept)
+- Some tests find 0 citations: Acceptable - validates graceful degradation
+
+These are not test failures - they validate that the code handles API issues gracefully.
 
 ## Debugging Integration Tests
 
@@ -257,14 +268,17 @@ def test_my_integration() -> None:
 
 Typical run times on good network connection:
 
-| Test | Duration | API Calls |
-|------|----------|-----------|
-| Unit tests (32) | ~0.2s | 0 |
-| ReproNim expansion | ~6s | ~30 |
-| DANDI DataCite | ~2s | ~3 |
-| Zenodo expansion | ~2s | 2 |
-| GitHub mapping | ~1s | 1-3 |
-| Full workflow | ~8s | ~35 |
-| **All integration (6)** | **~20s** | **~75** |
+| Test | Duration | API Calls | Notes |
+|------|----------|-----------|-------|
+| Unit tests (32) | ~0.2s | 0 | Always pass |
+| ReproNim expansion | ~6s | ~30 | |
+| DANDI DataCite | ~2s | ~3 | |
+| Zenodo expansion | ~2s | 2 | Often skipped (403) |
+| GitHub mapping | ~1s | 1-3 | |
+| Full workflow | ~8s | ~35 | |
+| **All integration (6)** | **~10-20s** | **~40-75** | 5-6 tests |
 
-Total: Unit (0.2s) + Integration (20s) = **~20s for all 38 tests**
+**Typical results**:
+- When Zenodo blocks: 5 passed, 1 skipped in ~10s
+- When Zenodo works: 6 passed in ~20s
+- Unit + Integration: ~10-20s for 37-38 tests total
