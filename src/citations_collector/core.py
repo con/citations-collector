@@ -51,7 +51,10 @@ class CitationCollector:
         return cls(collection)
 
     def expand_refs(
-        self, github_token: str | None = None, expand_types: list[str] | None = None
+        self,
+        github_token: str | None = None,
+        zenodo_token: str | None = None,
+        expand_types: list[str] | None = None,
     ) -> None:
         """
         Expand non-DOI references to DOI references.
@@ -64,6 +67,7 @@ class CitationCollector:
 
         Args:
             github_token: Optional GitHub token for API rate limits
+            zenodo_token: Optional Zenodo token for authentication
             expand_types: Which ref types to expand (default: ["zenodo_concept", "github"])
         """
         from citations_collector.importers import GitHubMapper, ZenodoExpander
@@ -75,7 +79,9 @@ class CitationCollector:
             return
 
         # Initialize expanders/mappers
-        zenodo_expander = ZenodoExpander() if "zenodo_concept" in expand_types else None
+        zenodo_expander = (
+            ZenodoExpander(zenodo_token=zenodo_token) if "zenodo_concept" in expand_types else None
+        )
         github_mapper = (
             GitHubMapper(github_token=github_token) if "github" in expand_types else None
         )

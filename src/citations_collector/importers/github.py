@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 
 import requests
@@ -36,11 +37,17 @@ class GitHubMapper:
         Initialize GitHub mapper.
 
         Args:
-            github_token: Optional GitHub personal access token for higher rate limits
+            github_token: Optional GitHub personal access token for higher rate limits.
+                         If not provided, reads from GITHUB_TOKEN environment variable.
         """
+        # Use provided token, or fallback to environment variable
+        if github_token is None:
+            github_token = os.getenv("GITHUB_TOKEN")
+
         self.session = requests.Session()
         if github_token:
             self.session.headers["Authorization"] = f"token {github_token}"
+            logger.debug("Using GitHub token for authentication")
 
     def map_to_doi(self, repo: str) -> ItemRef | None:
         """

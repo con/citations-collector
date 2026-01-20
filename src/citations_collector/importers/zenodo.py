@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 import requests
 
@@ -29,9 +30,23 @@ class ZenodoExpander:
 
     BASE_URL = "https://zenodo.org/api/records"
 
-    def __init__(self) -> None:
-        """Initialize Zenodo expander."""
+    def __init__(self, zenodo_token: str | None = None) -> None:
+        """
+        Initialize Zenodo expander.
+
+        Args:
+            zenodo_token: Optional Zenodo personal access token for authentication.
+                         If not provided, reads from ZENODO_TOKEN environment variable.
+        """
+        # Use provided token, or fallback to environment variable
+        if zenodo_token is None:
+            zenodo_token = os.getenv("ZENODO_TOKEN")
+
         self.session = requests.Session()
+        if zenodo_token:
+            # Zenodo accepts tokens as query parameters
+            self.session.params = {"access_token": zenodo_token}  # type: ignore
+            logger.debug("Using Zenodo token for authentication")
 
     def expand(self, concept_id: str) -> list[ItemRef]:
         """

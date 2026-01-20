@@ -187,11 +187,14 @@ def test_zenodo_expansion_real_concept() -> None:
     - Should expand to multiple version DOIs
     - Should include concept DOI + version DOIs
 
-    Note: Zenodo may return 403 Forbidden due to rate limiting or blocking.
-    This is an acceptable failure - test will be skipped rather than failing.
+    Note: Zenodo may return 403 Forbidden without authentication.
+    Set ZENODO_TOKEN environment variable to avoid this.
+    Test will be skipped if Zenodo blocks the request.
     """
+
     from citations_collector.importers import ZenodoExpander
 
+    # Use ZENODO_TOKEN from environment if available
     expander = ZenodoExpander()
 
     # DataLad concept ID

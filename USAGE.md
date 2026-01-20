@@ -12,6 +12,26 @@ uv pip install -e ".[devel]"
 uv pip install -e .
 ```
 
+## API Tokens (Recommended)
+
+To avoid rate limits and API blocks, set these environment variables:
+
+```bash
+# GitHub token (for --expand-refs with github repos)
+# Get one at: https://github.com/settings/tokens
+export GITHUB_TOKEN="your_github_token_here"
+
+# Zenodo token (for --expand-refs with zenodo_concept)
+# Get one at: https://zenodo.org/account/settings/applications/tokens/new/
+export ZENODO_TOKEN="your_zenodo_token_here"
+```
+
+**Without tokens you may see:**
+- `GitHub API error: 403 Client Error: rate limit exceeded` - Set `GITHUB_TOKEN`
+- `Zenodo API error: 403 Client Error: Forbidden` - Set `ZENODO_TOKEN`
+
+**Note**: Zenodo's new API (zenodo.org) may require authentication even for public records.
+
 ## Basic Commands
 
 ### Show Help
@@ -204,13 +224,13 @@ citations-collector discover tests/fixtures/collections/simple.yaml \
 
 ### Zenodo API (for expansion)
 - ✅ Expands concept records to all version DOIs
-- ⚠️ May rate limit if queried too frequently
-- 🌐 No authentication required
+- ⚠️ May return 403 Forbidden without authentication
+- 🔑 **Requires `ZENODO_TOKEN`** - Get one at https://zenodo.org/account/settings/applications/tokens/new/
 
 ### GitHub API (for mapping)
 - ✅ Maps GitHub repos to Zenodo DOIs
 - ⚠️ Rate limit: 60 requests/hour without token, 5000/hour with token
-- 💡 Set `GITHUB_TOKEN` environment variable for higher limits
+- 🔑 **Set `GITHUB_TOKEN`** for higher limits - Get one at https://github.com/settings/tokens
 
 ## Troubleshooting
 
@@ -229,9 +249,17 @@ citations-collector discover examples/repronim-tools.yaml --expand-refs --output
 ### Zenodo API Errors
 
 If Zenodo returns 403 Forbidden:
-- The Zenodo API may be temporarily blocking requests
-- Try again later or reduce request frequency
-- The tool will gracefully handle errors and continue with other refs
+- **Set `ZENODO_TOKEN`** environment variable (required for Zenodo's new API)
+- Get a token at: https://zenodo.org/account/settings/applications/tokens/new/
+- The tool will gracefully skip expansion if auth fails
+
+```bash
+# Set Zenodo token
+export ZENODO_TOKEN="your_zenodo_token_here"
+
+# Then run discovery
+citations-collector discover examples/repronim-tools.yaml --expand-refs --output citations.tsv
+```
 
 ### No Citations Found
 
