@@ -1,4 +1,4 @@
-"""CrossRef citation discovery."""
+"""CrossRef Event Data citation discovery."""
 
 from __future__ import annotations
 
@@ -14,13 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 class CrossRefDiscoverer(AbstractDiscoverer):
-    """Discover citations via CrossRef cited-by API."""
+    """Discover citations via CrossRef Event Data API."""
 
-    BASE_URL = "https://api.crossref.org/works"
+    BASE_URL = "https://api.eventdata.crossref.org/v1/events"
+    DOI_API = "https://doi.org"
 
     def __init__(self, email: str | None = None) -> None:
         """
-        Initialize CrossRef discoverer.
+        Initialize CrossRef Event Data discoverer.
 
         Args:
             email: Email for polite pool (better rate limits)
@@ -32,11 +33,11 @@ class CrossRefDiscoverer(AbstractDiscoverer):
 
     def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """
-        Discover citations from CrossRef.
+        Discover citations from CrossRef Event Data.
 
         Args:
             item_ref: DOI reference to query
-            since: Optional date for incremental updates (from-index-date filter)
+            since: Optional date for incremental updates (from-updated-date filter)
 
         Returns:
             List of citation records
@@ -46,64 +47,53 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             return []
 
         doi = item_ref.ref_value
-        url = f"{self.BASE_URL}/{doi}"
+
+        # Query CrossRef Event Data for citations
+        # obj-id is the DOI being cited, subj-id is the citing work
+        params = {"obj-id": doi, "rows": 1000}
 
         # Add date filter if provided
         if since:
             date_str = since.strftime("%Y-%m-%d")
-            url = f"{url}?filter=from-index-date:{date_str}"
+            params["from-updated-date"] = date_str
 
         try:
-            response = self.session.get(url, timeout=30)
+            response = self.session.get(self.BASE_URL, params=params, timeout=30)
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
-            logger.warning(f"CrossRef API error for {doi}: {e}")
+            logger.warning(f"CrossRef Event Data API error for {doi}: {e}")
             return []
 
-        # Parse citations from response
+        # Parse citations from events
         citations = []
-        message = data.get("message", {})
-        references = message.get("reference", [])
+        events = data.get("message", {}).get("events", [])
 
-        for ref in references:
-            ref_doi = ref.get("DOI")
-            if not ref_doi:
+        for event in events:
+            # Get the citing DOI
+            subj = event.get("subj", {})
+            citing_doi_url = subj.get("pid", "")
+
+            # Extract DOI from URL (e.g., "https://doi.org/10.1234/abc" -> "10.1234/abc")
+            citing_doi = citing_doi_url.replace("https://doi.org/", "").replace(
+                "http://doi.org/", ""
+            )
+
+            if not citing_doi or not citing_doi.startswith("10."):
                 continue
 
-            # Extract authors
-            authors = ref.get("author", [])
-            author_str = None
-            if authors:
-                author_names = [
-                    f"{a.get('given', '')} {a.get('family', '')}".strip() for a in authors
-                ]
-                author_str = "; ".join(author_names)
+            # Fetch metadata for the citing DOI via DOI content negotiation
+            metadata = self._fetch_doi_metadata(citing_doi)
 
-            # Extract year
-            year = None
-            published = ref.get("published", {})
-            date_parts = published.get("date-parts", [[]])
-            if date_parts and date_parts[0]:
-                year = date_parts[0][0]
-
-            # Extract title
-            titles = ref.get("title", [])
-            title = titles[0] if titles else None
-
-            # Extract journal
-            containers = ref.get("container-title", [])
-            journal = containers[0] if containers else None
-
-            # Create citation record
+            # Create citation record with metadata
             citation = CitationRecord(
                 item_id="",  # Will be filled by caller
                 item_flavor="",  # Will be filled by caller
-                citation_doi=ref_doi,
-                citation_title=title,
-                citation_authors=author_str,
-                citation_year=year,
-                citation_journal=journal,
+                citation_doi=citing_doi,
+                citation_title=metadata.get("title"),
+                citation_authors=metadata.get("authors"),
+                citation_year=metadata.get("year"),
+                citation_journal=metadata.get("journal"),
                 citation_relationship="Cites",  # type: ignore[arg-type]
                 citation_source=CitationSource("crossref"),
                 citation_status="active",  # type: ignore[arg-type]
@@ -111,3 +101,58 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             citations.append(citation)
 
         return citations
+
+    def _fetch_doi_metadata(self, doi: str) -> dict[str, str | int | None]:
+        """
+        Fetch metadata for a DOI via content negotiation.
+
+        Args:
+            doi: The DOI to fetch metadata for
+
+        Returns:
+            Dictionary with title, authors, year, journal
+        """
+        metadata: dict[str, str | int | None] = {
+            "title": None,
+            "authors": None,
+            "year": None,
+            "journal": None,
+        }
+
+        try:
+            response = self.session.get(
+                f"{self.DOI_API}/{doi}",
+                headers={"Accept": "application/json"},
+                timeout=30,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            # Extract title
+            metadata["title"] = data.get("title")
+
+            # Extract authors
+            authors = data.get("author", [])
+            if authors:
+                author_names = [
+                    f"{a.get('given', '')} {a.get('family', '')}".strip() for a in authors
+                ]
+                metadata["authors"] = "; ".join(author_names)
+
+            # Extract year
+            published = data.get("published", {})
+            date_parts = published.get("date-parts", [[]])
+            if date_parts and len(date_parts[0]) > 0:
+                metadata["year"] = date_parts[0][0]
+
+            # Extract journal (may be string or list)
+            container = data.get("container-title")
+            if isinstance(container, list):
+                metadata["journal"] = container[0] if container else None
+            else:
+                metadata["journal"] = container
+
+        except requests.RequestException as e:
+            logger.debug(f"Failed to fetch metadata for DOI {doi}: {e}")
+
+        return metadata

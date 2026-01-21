@@ -105,8 +105,13 @@ class CitationCollector:
                         if doi_ref:
                             expanded_refs.append(doi_ref)
 
-                # Add expanded refs to flavor
-                flavor.refs.extend(expanded_refs)
+                # Add expanded refs to flavor, avoiding duplicates
+                existing_ref_values = {(ref.ref_type, ref.ref_value) for ref in flavor.refs}
+                for expanded_ref in expanded_refs:
+                    ref_key = (expanded_ref.ref_type, expanded_ref.ref_value)
+                    if ref_key not in existing_ref_values:
+                        flavor.refs.append(expanded_ref)
+                        existing_ref_values.add(ref_key)
 
     def discover_all(
         self,

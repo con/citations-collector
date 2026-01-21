@@ -44,8 +44,8 @@ class ZenodoExpander:
 
         self.session = requests.Session()
         if zenodo_token:
-            # Zenodo accepts tokens as query parameters
-            self.session.params = {"access_token": zenodo_token}  # type: ignore
+            # Zenodo uses Bearer token authentication
+            self.session.headers["Authorization"] = f"Bearer {zenodo_token}"
             logger.debug("Using Zenodo token for authentication")
 
     def expand(self, concept_id: str) -> list[ItemRef]:
