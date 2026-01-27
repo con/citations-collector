@@ -30,9 +30,18 @@ items:
     - ref_type: doi
       ref_value: 10.48324/dandi.000005/0.210812.1500
 - item_id: dandi:000363
+  name: Mesoscale Activity Project
+  homepage: https://dandiarchive.org/dandiset/000363
   flavors:
-  - flavor_id: 0.0230822.0128
+  - flavor_id: 0.230822.0128
     refs:
     - ref_type: doi
       ref_value: 10.48324/dandi.000363/0.230822.0128
-last_updated: 2026-01-26 19:00:25.209232
+- item_id: dandi:000458
+  name: Cortical-Thalamic Neural Dynamics
+  homepage: https://dandiarchive.org/dandiset/000458
+  flavors:
+  - flavor_id: 0.230317.0039
+    refs:
+    - ref_type: doi
+      ref_value: 10.48324/dandi.000458/0.230317.0039
