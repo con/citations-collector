@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -11,15 +12,32 @@ from click.testing import CliRunner
 from citations_collector.cli import main
 
 
+def _copy_fixture(collections_dir: Path, tmp_path: Path) -> Path:
+    """Copy simple.yaml fixture to tmp_path so tests don't modify the original."""
+    src = collections_dir / "simple.yaml"
+    dst = tmp_path / "simple.yaml"
+    shutil.copy2(src, dst)
+    return dst
+
+
 @pytest.mark.ai_generated
 @responses.activate
 def test_discover_command(collections_dir: Path, tmp_path: Path) -> None:
     """Test discover command."""
+    collection_file = _copy_fixture(collections_dir, tmp_path)
+
     # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
         "https://api.eventdata.crossref.org/v1/events",
         json={"message": {"total-results": 0, "events": []}},
+        status=200,
+    )
+    # Mock DataCite Events API
+    responses.add(
+        responses.GET,
+        "https://api.datacite.org/events",
+        json={"data": []},
         status=200,
     )
 
@@ -30,7 +48,7 @@ def test_discover_command(collections_dir: Path, tmp_path: Path) -> None:
         main,
         [
             "discover",
-            str(collections_dir / "simple.yaml"),
+            str(collection_file),
             "--output",
             str(output_file),
         ],
@@ -45,11 +63,20 @@ def test_discover_command(collections_dir: Path, tmp_path: Path) -> None:
 @responses.activate
 def test_discover_full_refresh_flag(collections_dir: Path, tmp_path: Path) -> None:
     """Test discover with --full-refresh flag."""
+    collection_file = _copy_fixture(collections_dir, tmp_path)
+
     # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
         "https://api.eventdata.crossref.org/v1/events",
         json={"message": {"total-results": 0, "events": []}},
+        status=200,
+    )
+    # Mock DataCite Events API
+    responses.add(
+        responses.GET,
+        "https://api.datacite.org/events",
+        json={"data": []},
         status=200,
     )
 
@@ -60,7 +87,7 @@ def test_discover_full_refresh_flag(collections_dir: Path, tmp_path: Path) -> No
         main,
         [
             "discover",
-            str(collections_dir / "simple.yaml"),
+            str(collection_file),
             "--output",
             str(output_file),
             "--full-refresh",
@@ -76,6 +103,7 @@ def test_discover_email_env_var(
     collections_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test discover respects CROSSREF_EMAIL environment variable."""
+    collection_file = _copy_fixture(collections_dir, tmp_path)
     monkeypatch.setenv("CROSSREF_EMAIL", "test@example.org")
 
     runner = CliRunner()
@@ -89,12 +117,18 @@ def test_discover_email_env_var(
             json={"message": {"total-results": 0, "events": []}},
             status=200,
         )
+        rsps.add(
+            responses.GET,
+            "https://api.datacite.org/events",
+            json={"data": []},
+            status=200,
+        )
 
         result = runner.invoke(
             main,
             [
                 "discover",
-                str(collections_dir / "simple.yaml"),
+                str(collection_file),
                 "--output",
                 str(output_file),
             ],
