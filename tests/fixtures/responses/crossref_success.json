@@ -1,28 +1,26 @@
 {
   "status": "ok",
-  "message-type": "work",
+  "message-type": "event-list",
   "message": {
-    "DOI": "10.1234/test.dataset",
-    "is-referenced-by-count": 2,
-    "reference": [
+    "total-results": 2,
+    "events": [
       {
-        "DOI": "10.1234/citing.paper1",
-        "title": ["First paper citing our dataset"],
-        "author": [
-          {"given": "John", "family": "Smith"},
-          {"given": "Alice", "family": "Jones"}
-        ],
-        "published": {"date-parts": [[2024, 1, 15]]},
-        "container-title": ["Journal of Test Research"]
+        "id": "event-1",
+        "obj_id": "https://doi.org/10.1234/test.dataset",
+        "subj_id": "https://doi.org/10.1234/citing.paper1",
+        "subj": {
+          "pid": "https://doi.org/10.1234/citing.paper1"
+        },
+        "relation_type_id": "cites"
       },
       {
-        "DOI": "10.1234/citing.paper2",
-        "title": ["Second paper citing our dataset"],
-        "author": [
-          {"given": "Bob", "family": "Wilson"}
-        ],
-        "published": {"date-parts": [[2023, 6, 10]]},
-        "container-title": ["Test Science"]
+        "id": "event-2",
+        "obj_id": "https://doi.org/10.1234/test.dataset",
+        "subj_id": "https://doi.org/10.1234/citing.paper2",
+        "subj": {
+          "pid": "https://doi.org/10.1234/citing.paper2"
+        },
+        "relation_type_id": "cites"
       }
     ]
   }

@@ -56,6 +56,9 @@ linkml = [
     "linkml>=1.7.0",
     "linkml-runtime>=1.7.0",
 ]
+dandi = [
+    "dandi>=0.60.0",
+]
 
 [project.scripts]
 citations-collector = "citations_collector.cli:main"

@@ -1,9 +1,8 @@
 {
   "status": "ok",
-  "message-type": "work",
+  "message-type": "event-list",
   "message": {
-    "DOI": "10.1234/test.dataset",
-    "is-referenced-by-count": 0,
-    "reference": []
+    "total-results": 0,
+    "events": []
   }
 }

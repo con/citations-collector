@@ -8,6 +8,9 @@ from pathlib import Path
 import click
 
 from citations_collector.core import CitationCollector
+from citations_collector.importers.dandi import DANDIImporter
+from citations_collector.importers.zotero import ZoteroImporter
+from citations_collector.persistence import yaml_io
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +102,94 @@ def discover(
     # Save results
     collector.save(collection, output)
     click.echo(f"Saved to {output}")
+
+
+@main.command("import-dandi")
+@click.option(
+    "--output",
+    "-o",
+    required=True,
+    type=click.Path(path_type=Path),
+    help="Output YAML file for collection",
+)
+@click.option(
+    "--include-draft",
+    is_flag=True,
+    help="Include draft versions (no DOI)",
+)
+@click.option(
+    "--limit",
+    type=int,
+    help="Limit number of dandisets to import",
+)
+def import_dandi(output: Path, include_draft: bool, limit: int | None) -> None:
+    """Import all dandisets from DANDI Archive."""
+    click.echo("Importing dandisets from DANDI Archive...")
+
+    importer = DANDIImporter()
+
+    with click.progressbar(length=limit or 0, label="Importing") as bar:
+
+        def progress(current: int, total: int | None) -> None:
+            bar.update(1)
+
+        collection = importer.import_all(
+            include_draft=include_draft,
+            limit=limit,
+            progress_callback=progress if limit else None,
+        )
+
+    yaml_io.save_collection(collection, output)
+    click.echo(f"Imported {len(collection.items or [])} dandisets to {output}")
+
+
+@main.command("import-zotero")
+@click.option(
+    "--output",
+    "-o",
+    required=True,
+    type=click.Path(path_type=Path),
+    help="Output YAML file for collection",
+)
+@click.option(
+    "--group-id",
+    required=True,
+    type=int,
+    help="Zotero group ID",
+)
+@click.option(
+    "--collection-key",
+    help="Specific collection within group",
+)
+@click.option(
+    "--api-key",
+    envvar="ZOTERO_API_KEY",
+    help="Zotero API key (optional for public groups)",
+)
+@click.option(
+    "--limit",
+    type=int,
+    help="Limit number of items to import",
+)
+def import_zotero(
+    output: Path,
+    group_id: int,
+    collection_key: str | None,
+    api_key: str | None,
+    limit: int | None,
+) -> None:
+    """Import items from a Zotero group."""
+    click.echo(f"Importing items from Zotero group {group_id}...")
+
+    importer = ZoteroImporter(api_key=api_key)
+    collection = importer.import_group(
+        group_id=group_id,
+        collection_key=collection_key,
+        limit=limit,
+    )
+
+    yaml_io.save_collection(collection, output)
+    click.echo(f"Imported {len(collection.items or [])} items to {output}")
 
 
 @main.command("sync-zotero")

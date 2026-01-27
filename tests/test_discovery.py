@@ -21,16 +21,40 @@ from citations_collector.models import ItemRef
 @pytest.mark.ai_generated
 @responses.activate
 def test_crossref_success(responses_dir: Path) -> None:
-    """Test successful citation discovery from CrossRef."""
+    """Test successful citation discovery from CrossRef Event Data."""
     # Load mock response
     with open(responses_dir / "crossref_success.json") as f:
         mock_data = json.load(f)
 
-    # Mock CrossRef API
+    # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset",
+        "https://api.eventdata.crossref.org/v1/events",
         json=mock_data,
+        status=200,
+    )
+
+    # Mock DOI metadata endpoint for each citing DOI
+    responses.add(
+        responses.GET,
+        "https://doi.org/10.1234/citing.paper1",
+        json={
+            "title": "First paper citing our dataset",
+            "author": [{"given": "John", "family": "Smith"}],
+            "published": {"date-parts": [[2024, 1, 15]]},
+            "container-title": ["Journal of Test Research"],
+        },
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        "https://doi.org/10.1234/citing.paper2",
+        json={
+            "title": "Second paper citing our dataset",
+            "author": [{"given": "Bob", "family": "Wilson"}],
+            "published": {"date-parts": [[2023, 6, 10]]},
+            "container-title": ["Test Science"],
+        },
         status=200,
     )
 
@@ -53,15 +77,15 @@ def test_crossref_success(responses_dir: Path) -> None:
 @pytest.mark.ai_generated
 @responses.activate
 def test_crossref_empty_results(responses_dir: Path) -> None:
-    """Test CrossRef with no citations."""
+    """Test CrossRef Event Data with no citations."""
     # Load mock response
     with open(responses_dir / "crossref_empty.json") as f:
         mock_data = json.load(f)
 
-    # Mock CrossRef API
+    # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset",
+        "https://api.eventdata.crossref.org/v1/events",
         json=mock_data,
         status=200,
     )
@@ -84,7 +108,7 @@ def test_crossref_network_error() -> None:
     # Mock network error
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset",
+        "https://api.eventdata.crossref.org/v1/events",
         status=500,
     )
 
@@ -100,16 +124,29 @@ def test_crossref_network_error() -> None:
 @pytest.mark.ai_generated
 @responses.activate
 def test_opencitations_discovery(responses_dir: Path) -> None:
-    """Test OpenCitations citation discovery."""
+    """Test OpenCitations COCI citation discovery."""
     # Load mock response
     with open(responses_dir / "opencitations_success.json") as f:
         mock_data = json.load(f)
 
-    # Mock OpenCitations API
+    # Mock OpenCitations COCI API (v1)
     responses.add(
         responses.GET,
-        "https://opencitations.net/index/api/v2/citations/10.1234/test.dataset",
+        "https://opencitations.net/index/coci/api/v1/citations/10.1234/test.dataset",
         json=mock_data,
+        status=200,
+    )
+
+    # Mock DOI metadata endpoint for citing DOI
+    responses.add(
+        responses.GET,
+        "https://doi.org/10.1234/citing.paper3",
+        json={
+            "title": "Third paper citing our dataset",
+            "author": [{"given": "Jane", "family": "Doe"}],
+            "published": {"date-parts": [[2024, 2, 1]]},
+            "container-title": ["Citation Journal"],
+        },
         status=200,
     )
 
@@ -130,11 +167,11 @@ def test_opencitations_discovery(responses_dir: Path) -> None:
 @responses.activate
 def test_incremental_date_filtering() -> None:
     """Test incremental discovery using date filters."""
-    # Mock CrossRef API with date filter
+    # Mock CrossRef Event Data API with date filter
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset?filter=from-index-date:2024-01-01",
-        json={"message": {"reference": []}},
+        "https://api.eventdata.crossref.org/v1/events",
+        json={"message": {"total-results": 0, "events": []}},
         status=200,
     )
 
@@ -146,9 +183,9 @@ def test_incremental_date_filtering() -> None:
     since = datetime(2024, 1, 1)
     discoverer.discover(item_ref, since=since)
 
-    # Should have called API with date filter
+    # Should have called API with date filter (from-updated-date for Event Data API)
     assert len(responses.calls) == 1
-    assert "from-index-date:2024-01-01" in responses.calls[0].request.url
+    assert "from-updated-date=2024-01-01" in responses.calls[0].request.url
 
 
 @pytest.mark.ai_generated

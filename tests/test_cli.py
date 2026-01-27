@@ -15,11 +15,11 @@ from citations_collector.cli import main
 @responses.activate
 def test_discover_command(collections_dir: Path, tmp_path: Path) -> None:
     """Test discover command."""
-    # Mock CrossRef API
+    # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset",
-        json={"message": {"reference": []}},
+        "https://api.eventdata.crossref.org/v1/events",
+        json={"message": {"total-results": 0, "events": []}},
         status=200,
     )
 
@@ -45,11 +45,11 @@ def test_discover_command(collections_dir: Path, tmp_path: Path) -> None:
 @responses.activate
 def test_discover_full_refresh_flag(collections_dir: Path, tmp_path: Path) -> None:
     """Test discover with --full-refresh flag."""
-    # Mock CrossRef API
+    # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset",
-        json={"message": {"reference": []}},
+        "https://api.eventdata.crossref.org/v1/events",
+        json={"message": {"total-results": 0, "events": []}},
         status=200,
     )
 
@@ -85,8 +85,8 @@ def test_discover_email_env_var(
     with responses.RequestsMock() as rsps:
         rsps.add(
             responses.GET,
-            "https://api.crossref.org/works/10.1234/test.dataset",
-            json={"message": {"reference": []}},
+            "https://api.eventdata.crossref.org/v1/events",
+            json={"message": {"total-results": 0, "events": []}},
             status=200,
         )
 

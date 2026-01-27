@@ -24,21 +24,35 @@ def test_from_yaml(collections_dir: Path) -> None:
 @responses.activate
 def test_discover_all_with_mocks(collections_dir: Path) -> None:
     """Test discover_all with mocked APIs."""
-    # Mock CrossRef API
+    # Mock CrossRef Event Data API
     responses.add(
         responses.GET,
-        "https://api.crossref.org/works/10.1234/test.dataset",
+        "https://api.eventdata.crossref.org/v1/events",
         json={
             "message": {
-                "reference": [
+                "total-results": 1,
+                "events": [
                     {
-                        "DOI": "10.1234/citing.paper",
-                        "title": ["Test citation"],
-                        "author": [{"given": "John", "family": "Doe"}],
-                        "published": {"date-parts": [[2024]]},
+                        "id": "event-1",
+                        "obj_id": "https://doi.org/10.1234/test.dataset",
+                        "subj_id": "https://doi.org/10.1234/citing.paper",
+                        "subj": {"pid": "https://doi.org/10.1234/citing.paper"},
+                        "relation_type_id": "cites",
                     }
-                ]
+                ],
             }
+        },
+        status=200,
+    )
+
+    # Mock DOI metadata endpoint
+    responses.add(
+        responses.GET,
+        "https://doi.org/10.1234/citing.paper",
+        json={
+            "title": "Test citation",
+            "author": [{"given": "John", "family": "Doe"}],
+            "published": {"date-parts": [[2024]]},
         },
         status=200,
     )
