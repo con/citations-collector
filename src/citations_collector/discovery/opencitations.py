@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime
+from typing import cast
 
 import requests
 
@@ -99,10 +100,10 @@ class OpenCitationsDiscoverer(AbstractDiscoverer):
                 item_id="",  # Will be filled by caller
                 item_flavor="",  # Will be filled by caller
                 citation_doi=citing_doi,
-                citation_title=metadata.get("title"),
-                citation_authors=metadata.get("authors"),
-                citation_year=metadata.get("year"),
-                citation_journal=metadata.get("journal"),
+                citation_title=cast(str | None, metadata.get("title")),
+                citation_authors=cast(str | None, metadata.get("authors")),
+                citation_year=cast(int | None, metadata.get("year")),
+                citation_journal=cast(str | None, metadata.get("journal")),
                 citation_relationship="Cites",  # type: ignore[arg-type]
                 citation_source=CitationSource("opencitations"),
                 citation_status="active",  # type: ignore[arg-type]

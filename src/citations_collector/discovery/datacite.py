@@ -6,6 +6,7 @@ import logging
 import re
 from contextlib import suppress
 from datetime import datetime
+from typing import cast
 
 import requests
 
@@ -134,11 +135,11 @@ class DataCiteDiscoverer(AbstractDiscoverer):
             # If missing metadata, fetch from DOI
             if not title:
                 metadata = self._fetch_doi_metadata(citing_doi)
-                title = metadata.get("title")  # Already sanitized
+                title = cast(str | None, metadata.get("title"))  # Already sanitized
                 if not year:
-                    year = metadata.get("year")
-                authors = metadata.get("authors")
-                journal = metadata.get("journal")
+                    year = cast(int | None, metadata.get("year"))
+                authors = cast(str | None, metadata.get("authors"))
+                journal = cast(str | None, metadata.get("journal"))
             else:
                 authors = None
                 journal = None
@@ -189,10 +190,10 @@ class DataCiteDiscoverer(AbstractDiscoverer):
                 item_id="",
                 item_flavor="",
                 citation_doi=citing_doi,
-                citation_title=metadata.get("title"),
-                citation_authors=metadata.get("authors"),
-                citation_year=metadata.get("year"),
-                citation_journal=metadata.get("journal"),
+                citation_title=cast(str | None, metadata.get("title")),
+                citation_authors=cast(str | None, metadata.get("authors")),
+                citation_year=cast(int | None, metadata.get("year")),
+                citation_journal=cast(str | None, metadata.get("journal")),
                 citation_relationship="Cites",  # type: ignore[arg-type]
                 citation_source=CitationSource("datacite"),
                 citation_status="active",  # type: ignore[arg-type]

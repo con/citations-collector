@@ -6,6 +6,7 @@ import logging
 import os
 import re
 from datetime import date
+from typing import Any, cast
 
 from pyzotero import zotero
 
@@ -91,26 +92,30 @@ class ZoteroImporter:
             items=items,
         )
 
-    def _fetch_all_items(self, zot: zotero.Zotero, limit: int | None = None) -> list[dict]:
+    def _fetch_all_items(
+        self, zot: zotero.Zotero, limit: int | None = None
+    ) -> list[dict[str, Any]]:
         """Fetch all items from a Zotero library."""
         try:
             if limit:
-                return zot.items(limit=limit)
+                return cast(list[dict[str, Any]], zot.items(limit=limit))
             else:
-                return zot.everything(zot.items())
+                return cast(list[dict[str, Any]], zot.everything(zot.items()))
         except Exception as e:
             logger.error(f"Failed to fetch Zotero items: {e}")
             return []
 
     def _fetch_collection_items(
         self, zot: zotero.Zotero, collection_key: str, limit: int | None = None
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Fetch items from a specific collection."""
         try:
             if limit:
-                return zot.collection_items(collection_key, limit=limit)
+                return cast(list[dict[str, Any]], zot.collection_items(collection_key, limit=limit))
             else:
-                return zot.everything(zot.collection_items(collection_key))
+                return cast(
+                    list[dict[str, Any]], zot.everything(zot.collection_items(collection_key))
+                )
         except Exception as e:
             logger.error(f"Failed to fetch collection {collection_key}: {e}")
             return []
@@ -119,7 +124,8 @@ class ZoteroImporter:
         """Get the name of a collection."""
         try:
             collection = zot.collection(collection_key)
-            return collection.get("data", {}).get("name")
+            name: str | None = collection.get("data", {}).get("name")
+            return name
         except Exception:
             return None
 
@@ -198,14 +204,14 @@ class ZoteroImporter:
             flavors=[flavor],
         )
 
-    def _extract_doi(self, data: dict) -> str | None:
+    def _extract_doi(self, data: dict[str, Any]) -> str | None:
         """
         Extract DOI from Zotero item data.
 
         Checks multiple fields where DOI might be stored.
         """
         # Check dedicated DOI field
-        doi = data.get("DOI", "")
+        doi: str = data.get("DOI", "")
         if doi and self.DOI_PATTERN.match(doi):
             return doi
 

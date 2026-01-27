@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import contextlib
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import date
+from typing import Any
 
 import requests
 
@@ -46,7 +47,7 @@ class DANDIImporter:
         self,
         include_draft: bool = False,
         limit: int | None = None,
-        progress_callback: callable | None = None,
+        progress_callback: Callable[[int, int | None], None] | None = None,
     ) -> Collection:
         """
         Import all dandisets as a Collection.
@@ -97,8 +98,8 @@ class DANDIImporter:
         Yields:
             Dandiset metadata dictionaries from API
         """
-        url = f"{self.api_url}/dandisets/"
-        params = {"page_size": self.PAGE_SIZE, "ordering": "identifier"}
+        url: str | None = f"{self.api_url}/dandisets/"
+        params: dict[str, Any] = {"page_size": self.PAGE_SIZE, "ordering": "identifier"}
 
         while url:
             try:
@@ -164,12 +165,12 @@ class DANDIImporter:
         Returns:
             List of ItemFlavor objects for each version with a DOI
         """
-        url = f"{self.api_url}/dandisets/{dandiset_id}/versions/"
+        url: str | None = f"{self.api_url}/dandisets/{dandiset_id}/versions/"
         flavors: list[ItemFlavor] = []
 
         try:
             # Paginate through versions
-            params = {"page_size": 100, "ordering": "-created"}
+            params: dict[str, Any] = {"page_size": 100, "ordering": "-created"}
 
             while url:
                 response = self.session.get(url, params=params, timeout=60)
