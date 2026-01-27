@@ -14,10 +14,14 @@ from citations_collector.models.generated import (
     Collection,
     CurationConfig,
     CurationRule,
+    DiscoverConfig,
     Item,
     ItemFlavor,
     ItemRef,
+    PdfsConfig,
     RefType,
+    SourceConfig,
+    ZoteroConfig,
 )
 
 __all__ = [
@@ -29,8 +33,12 @@ __all__ = [
     "Collection",
     "CurationConfig",
     "CurationRule",
+    "DiscoverConfig",
     "Item",
     "ItemFlavor",
     "ItemRef",
+    "PdfsConfig",
     "RefType",
+    "SourceConfig",
+    "ZoteroConfig",
 ]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from datetime import date, datetime
 from enum import Enum
@@ -14,6 +15,7 @@ from pydantic import (
     SerializerFunctionWrapHandler,
     field_validator,
     model_serializer,
+    model_validator,
 )
 
 metamodel_version = "None"
@@ -329,6 +331,9 @@ class CitationRecord(ConfiguredBaseModel):
     citation_comment: str | None = Field(default=None, description="""Curator notes about this citation.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     curated_by: str | None = Field(default=None, description="""Who made the curation decision.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     curated_date: date | None = Field(default=None, description="""When the curation decision was made (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    oa_status: str | None = Field(default=None, description="""Open access status from Unpaywall: gold, green, bronze, hybrid, or closed.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    pdf_url: str | None = Field(default=None, description="""Best open access PDF URL from Unpaywall.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    pdf_path: str | None = Field(default=None, description="""Relative path to locally stored PDF file.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
 
     @field_validator('citation_doi')
     def pattern_citation_doi(cls, v):
@@ -357,6 +362,50 @@ class CitationRecord(ConfiguredBaseModel):
         return v
 
 
+class SourceConfig(ConfiguredBaseModel):
+    """
+    Configuration for the item source (e.g., DANDI, Zenodo).
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
+
+    type: str | None = Field(default=None, description="""Source type: "dandi", "zenodo_org", "zenodo_collection", "github_org", "yaml", etc.""", json_schema_extra = { "linkml_meta": {'domain_of': ['SourceConfig']} })
+    update_items: str | None = Field(default=None, description="""How to handle items during import: "add" (only add new items) or "sync" (add new and update existing).""", json_schema_extra = { "linkml_meta": {'domain_of': ['SourceConfig']} })
+    include_draft: bool | None = Field(default=False, description="""Include draft/unpublished items.""", json_schema_extra = { "linkml_meta": {'domain_of': ['SourceConfig'], 'ifabsent': 'false'} })
+    group_id: int | None = Field(default=None, description="""Numeric group/org ID (if applicable).""", json_schema_extra = { "linkml_meta": {'domain_of': ['SourceConfig']} })
+    collection_key: str | None = Field(default=None, description="""Collection key within the source (if applicable).""", json_schema_extra = { "linkml_meta": {'domain_of': ['SourceConfig']} })
+
+
+class DiscoverConfig(ConfiguredBaseModel):
+    """
+    Configuration for citation discovery.
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
+
+    sources: list[str] | None = Field(default=[], description="""List of discovery source names to query (e.g., crossref, opencitations, datacite).""", json_schema_extra = { "linkml_meta": {'domain_of': ['DiscoverConfig']} })
+    email: str | None = Field(default=None, description="""Contact email for API polite pools.""", json_schema_extra = { "linkml_meta": {'domain_of': ['DiscoverConfig']} })
+
+
+class PdfsConfig(ConfiguredBaseModel):
+    """
+    Configuration for PDF retrieval.
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
+
+    output_dir: str | None = Field(default="pdfs/", description="""Directory to store downloaded PDFs.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PdfsConfig'], 'ifabsent': 'string(pdfs/)'} })
+    unpaywall_email: str | None = Field(default="site-unpaywall@oneukrainian.com", description="""Email for Unpaywall API.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PdfsConfig'], 'ifabsent': 'string(site-unpaywall@oneukrainian.com)'} })
+    git_annex: bool | None = Field(default=False, description="""Store PDFs in git-annex instead of git.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PdfsConfig'], 'ifabsent': 'false'} })
+
+
+class ZoteroConfig(ConfiguredBaseModel):
+    """
+    Configuration for Zotero integration.
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
+
+    group_id: int | None = Field(default=None, description="""Zotero group library ID.""", json_schema_extra = { "linkml_meta": {'domain_of': ['ZoteroConfig']} })
+    collection_key: str | None = Field(default=None, description="""Zotero collection key to sync into.""", json_schema_extra = { "linkml_meta": {'domain_of': ['ZoteroConfig']} })
+
+
 class Collection(ConfiguredBaseModel):
     """
     A collection of tracked items. This is the root object that gets serialized to collection.yaml.
@@ -367,11 +416,49 @@ class Collection(ConfiguredBaseModel):
     description: str | None = Field(default=None, description="""Description of the collection.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Item', 'Collection']} })
     homepage: str | None = Field(default=None, description="""URL to the collection homepage.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Item', 'Collection']} })
     maintainers: list[str] | None = Field(default=[], description="""List of maintainer names or emails.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
-    source_type: str | None = Field(default=None, description="""Hint for auto-import: \"dandi\", \"zenodo_org\", \"zenodo_collection\", \"github_org\", \"yaml\", etc.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
-    source_config: str | None = Field(default=None, description="""Configuration for auto-import (JSON string or nested object).""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
-    zotero_group_id: int | None = Field(default=None, description="""Zotero group ID for syncing.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
-    zotero_collection_key: str | None = Field(default=None, description="""Zotero parent collection key.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    source_type: str | None = Field(default=None, description="""DEPRECATED: Use source.type instead. Hint for auto-import.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    source_config: str | None = Field(default=None, description="""DEPRECATED: Use source block instead. Configuration for auto-import (JSON string or nested object).""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    output_tsv: str | None = Field(default=None, description="""Path to the output TSV file for citations.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    source: SourceConfig | None = Field(default=None, description="""Source configuration block.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    discover: DiscoverConfig | None = Field(default=None, description="""Citation discovery configuration block.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    pdfs: PdfsConfig | None = Field(default=None, description="""PDF retrieval configuration block.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    zotero: ZoteroConfig | None = Field(default=None, description="""Zotero integration configuration block.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    zotero_group_id: int | None = Field(default=None, description="""DEPRECATED: Use zotero.group_id instead.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+    zotero_collection_key: str | None = Field(default=None, description="""DEPRECATED: Use zotero.collection_key instead.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
     items: list[Item] | None = Field(default=[], description="""Items in this collection.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_flat_fields(cls, data: Any) -> Any:
+        """Migrate deprecated flat fields into nested config objects."""
+        if not isinstance(data, dict):
+            return data
+
+        # Migrate source_type / source_config -> source
+        if data.get("source_type") and not data.get("source"):
+            source: dict[str, Any] = {"type": data["source_type"]}
+            sc = data.get("source_config")
+            if isinstance(sc, str):
+                try:
+                    sc = json.loads(sc)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            if isinstance(sc, dict):
+                source.update(sc)
+            data["source"] = source
+
+        # Migrate zotero_group_id / zotero_collection_key -> zotero
+        zg = data.get("zotero_group_id")
+        zk = data.get("zotero_collection_key")
+        if (zg is not None or zk is not None) and not data.get("zotero"):
+            zotero: dict[str, Any] = {}
+            if zg is not None:
+                zotero["group_id"] = zg
+            if zk is not None:
+                zotero["collection_key"] = zk
+            data["zotero"] = zotero
+
+        return data
     created_date: date | None = Field(default=None, description="""When this collection was created.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection', 'CurationRule']} })
     last_updated: datetime | None = Field(default=None, description="""When the collection was last updated.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
 
@@ -410,6 +497,10 @@ ItemRef.model_rebuild()
 ItemFlavor.model_rebuild()
 Item.model_rebuild()
 CitationRecord.model_rebuild()
+SourceConfig.model_rebuild()
+DiscoverConfig.model_rebuild()
+PdfsConfig.model_rebuild()
+ZoteroConfig.model_rebuild()
 Collection.model_rebuild()
 CurationRule.model_rebuild()
 CurationConfig.model_rebuild()

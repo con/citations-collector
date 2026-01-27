@@ -1,9 +1,24 @@
 name: DANDI Archive
 description: Neural data archive with versioned dandisets
 homepage: https://dandiarchive.org
-source_type: dandi
-zotero_group_id: 5774211
-zotero_collection_key: UHK47FKX
+output_tsv: dandi-citations.tsv
+source:
+  type: dandi
+  update_items: sync
+  include_draft: false
+discover:
+  sources:
+    - crossref
+    - datacite
+    - opencitations
+  email: admin@dandiarchive.org
+pdfs:
+  output_dir: pdfs/
+  unpaywall_email: site-unpaywall@oneukrainian.com
+  git_annex: false
+zotero:
+  group_id: 5774211
+  collection_key: UHK47FKX
 items:
 - item_id: dandi:000003
   name: Physiological Properties and Behavioral Correlates of Hippocampal Granule
