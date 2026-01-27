@@ -1,3 +1,4 @@
 .npm/
 __pycache__/
 *.lock
+src/citations_collector/_version.py
