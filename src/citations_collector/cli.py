@@ -49,7 +49,7 @@ def main(verbose: bool) -> None:
     "--sources",
     multiple=True,
     type=click.Choice(["crossref", "opencitations", "datacite"]),
-    help="Which sources to query (default: crossref+opencitations)",
+    help="Which sources to query (default: all available)",
 )
 @click.option(
     "--expand-refs",

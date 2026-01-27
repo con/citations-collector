@@ -123,13 +123,13 @@ class CitationCollector:
         Discover citations for all items in collection.
 
         Args:
-            sources: Which discoverers to use (default: ["crossref", "opencitations"])
+            sources: Which discoverers to use (default: all available)
                      Available: "crossref", "opencitations", "datacite"
             incremental: Use last_updated for date filtering
             email: Email for CrossRef polite pool
         """
         if sources is None:
-            sources = ["crossref", "opencitations"]
+            sources = ["crossref", "opencitations", "datacite"]
 
         # Initialize discoverers
         discoverers: list[
