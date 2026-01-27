@@ -1,0 +1,33 @@
+name: StudyForrest
+description: High-resolution 7-Tesla fMRI dataset with complex naturalistic stimulation
+homepage: https://studyforrest.org
+source_type: studyforrest
+items:
+- item_id: studyforrest
+  name: StudyForrest Project
+  homepage: https://studyforrest.org
+  flavors:
+  - flavor_id: latest
+    refs:
+    - ref_type: doi
+      ref_value: 10.1038/sdata.2014.3
+    - ref_type: doi
+      ref_value: 10.12688/f1000research.6679.1
+    - ref_type: doi
+      ref_value: 10.12688/f1000research.6230.1
+    - ref_type: doi
+      ref_value: 10.1038/sdata.2016.92
+    - ref_type: doi
+      ref_value: 10.1038/sdata.2016.93
+    - ref_type: doi
+      ref_value: 10.12688/f1000research.9536.1
+    - ref_type: doi
+      ref_value: 10.12688/f1000research.9635.1
+    - ref_type: doi
+      ref_value: 10.1016/j.dib.2017.05.014
+    - ref_type: doi
+      ref_value: 10.1038/s41597-019-0209-0
+    - ref_type: doi
+      ref_value: 10.1038/s41597-019-0303-3
+    - ref_type: doi
+      ref_value: 10.12688/f1000research.27621.1

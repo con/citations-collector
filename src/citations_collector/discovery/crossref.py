@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 
 import requests
@@ -11,6 +12,18 @@ from citations_collector.discovery.base import AbstractDiscoverer
 from citations_collector.models import CitationRecord, CitationSource, ItemRef
 
 logger = logging.getLogger(__name__)
+
+
+def _sanitize_text(text: str | None) -> str | None:
+    """Sanitize text for TSV output - normalize whitespace, remove control chars."""
+    if text is None:
+        return None
+    # Replace newlines, tabs, carriage returns with spaces
+    text = re.sub(r"[\n\r\t]+", " ", text)
+    # Collapse multiple spaces
+    text = re.sub(r" +", " ", text)
+    # Strip leading/trailing whitespace
+    return text.strip() or None
 
 
 class CrossRefDiscoverer(AbstractDiscoverer):
@@ -128,8 +141,8 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             response.raise_for_status()
             data = response.json()
 
-            # Extract title
-            metadata["title"] = data.get("title")
+            # Extract title (sanitize for TSV)
+            metadata["title"] = _sanitize_text(data.get("title"))
 
             # Extract authors
             authors = data.get("author", [])
@@ -137,7 +150,7 @@ class CrossRefDiscoverer(AbstractDiscoverer):
                 author_names = [
                     f"{a.get('given', '')} {a.get('family', '')}".strip() for a in authors
                 ]
-                metadata["authors"] = "; ".join(author_names)
+                metadata["authors"] = _sanitize_text("; ".join(author_names))
 
             # Extract year
             published = data.get("published", {})
@@ -145,12 +158,12 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             if date_parts and len(date_parts[0]) > 0:
                 metadata["year"] = date_parts[0][0]
 
-            # Extract journal (may be string or list)
+            # Extract journal (may be string or list, sanitize for TSV)
             container = data.get("container-title")
             if isinstance(container, list):
-                metadata["journal"] = container[0] if container else None
+                metadata["journal"] = _sanitize_text(container[0]) if container else None
             else:
-                metadata["journal"] = container
+                metadata["journal"] = _sanitize_text(container)
 
         except requests.RequestException as e:
             logger.debug(f"Failed to fetch metadata for DOI {doi}: {e}")
