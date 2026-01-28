@@ -388,24 +388,24 @@ def detect_merges(
     Uses CrossRef API to find "is-preprint-of" relationships and marks
     preprints as merged with citation_status=merged.
     """
-    from citations_collector import core
+    from citations_collector.core import CitationCollector
     from citations_collector.merge_detection import MergeDetector
-    from citations_collector.models import generated
     from citations_collector.persistence import tsv_io
 
     # Load config if provided
     pdfs_cfg = None
     if config:
-        cfg = generated.CollectionConfig.model_validate(core.load_yaml(config))
+        collector = CitationCollector.from_yaml(config)
+        cfg = collector.collection
         pdfs_cfg = cfg.pdfs
-
-    # Resolve TSV path
-    if not tsv:
-        if not config:
-            raise click.UsageError("Must provide either --config or --tsv")
-        tsv_path = core.get_collection_path(config) / "citations.tsv"
-    else:
+        if not tsv:
+            tsv_path = Path(cfg.output_tsv) if cfg.output_tsv else Path("citations.tsv")
+        else:
+            tsv_path = tsv
+    elif tsv:
         tsv_path = tsv
+    else:
+        raise click.UsageError("Must provide either --config or --tsv")
 
     # Resolve email
     email_resolved: str = (
