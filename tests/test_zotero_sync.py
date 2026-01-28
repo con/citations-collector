@@ -131,14 +131,14 @@ def test_citation_to_zotero_item() -> None:
     syncer = _create_syncer()
     citation = _make_citation()
 
-    item = syncer._citation_to_zotero_item(citation, "COLL_KEY")
+    item = syncer._citation_to_zotero_item(citation, ["COLL_KEY", "PARENT_KEY"])
 
     assert item["itemType"] == "preprint"  # Preprint type mapping
     assert item["title"] == "Test Paper"
     assert item["DOI"] == "10.1234/test"
     assert item["url"] == "https://example.com/paper"
     assert item["date"] == "2024"
-    assert item["collections"] == ["COLL_KEY"]
+    assert item["collections"] == ["COLL_KEY", "PARENT_KEY"]
     assert "CitationTracker:" in item["extra"]
     # Verify authors parsed
     assert len(item["creators"]) == 2

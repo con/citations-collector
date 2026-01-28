@@ -30,12 +30,18 @@ class ZoteroSyncer:
     """Sync citation records to Zotero as hierarchical collections.
 
     Creates a two-level collection hierarchy under the configured top-level
-    collection:
+    collection::
 
         top_collection/
-            {item_id} - {item_name}/
+            {item_id}/
                 {flavor}/
-                    <citation items>
+                    <active citation items>
+                    Merged/
+                        <preprints and old versions>
+
+    Active citations are dual-assigned to both the item-level and
+    flavor-level collections so they appear when browsing either level.
+    Merged citations are only placed in the ``Merged`` subcollection.
 
     Each citation item includes a tracker key in the ``extra`` field
     (``CitationTracker: {item_id}/{flavor}/{doi_or_url}``) so that
@@ -85,15 +91,16 @@ class ZoteroSyncer:
                 if dry_run:
                     logger.info("Would create collection: %s", item_collection_name)
                     report.collections_created += 1
-                    # Cannot continue without a real key in dry-run; log everything
-                    for flavor_id, flavor_citations in flavors.items():
+                    for flavor_id, buckets in flavors.items():
                         logger.info("  Would create sub-collection: %s", flavor_id)
                         report.collections_created += 1
-                        for c in flavor_citations:
-                            logger.info(
-                                "    Would create item: %s", c.citation_doi or c.citation_title
-                            )
-                            report.items_created += 1
+                        for bucket_citations in buckets.values():
+                            for c in bucket_citations:
+                                logger.info(
+                                    "    Would create item: %s",
+                                    c.citation_doi or c.citation_title,
+                                )
+                                report.items_created += 1
                     continue
                 item_coll_key = self._create_collection(
                     item_collection_name, self.top_collection_key
@@ -104,7 +111,7 @@ class ZoteroSyncer:
             # Fetch sub-collections for this item
             item_subcollections = self._fetch_subcollections(item_coll_key)
 
-            for flavor_id, flavor_citations in flavors.items():
+            for flavor_id, buckets in flavors.items():
                 # Find or create flavor-level collection
                 flavor_coll_key = self._find_collection(item_subcollections, flavor_id)
                 if not flavor_coll_key:
@@ -115,22 +122,49 @@ class ZoteroSyncer:
                             item_collection_name,
                         )
                         report.collections_created += 1
-                        for c in flavor_citations:
-                            logger.info(
-                                "    Would create item: %s",
-                                c.citation_doi or c.citation_title,
-                            )
-                            report.items_created += 1
+                        for bucket_citations in buckets.values():
+                            for c in bucket_citations:
+                                logger.info(
+                                    "    Would create item: %s",
+                                    c.citation_doi or c.citation_title,
+                                )
+                                report.items_created += 1
                         continue
                     flavor_coll_key = self._create_collection(flavor_id, item_coll_key)
                     report.collections_created += 1
                     item_subcollections[flavor_coll_key] = flavor_id
 
-                # Sync citation items into this flavor collection
-                for citation in flavor_citations:
+                # Resolve Merged subcollection only if needed
+                merged_coll_key: str | None = None
+
+                # Sync active citations — dual-assign to item + flavor collections
+                for citation in buckets.get("active", []):
                     self._sync_single_citation(
-                        citation, flavor_coll_key, existing_items, dry_run, report
+                        citation,
+                        [item_coll_key, flavor_coll_key],
+                        existing_items,
+                        dry_run,
+                        report,
                     )
+
+                # Sync merged citations — only in Merged subcollection
+                merged_list = buckets.get("merged", [])
+                if merged_list:
+                    flavor_subcollections = self._fetch_subcollections(flavor_coll_key)
+                    merged_coll_key = self._find_collection(flavor_subcollections, "Merged")
+                    if not merged_coll_key:
+                        if dry_run:
+                            logger.info("    Would create sub-collection: Merged")
+                            report.collections_created += 1
+                        else:
+                            merged_coll_key = self._create_collection("Merged", flavor_coll_key)
+                            report.collections_created += 1
+
+                    for citation in merged_list:
+                        target = [merged_coll_key] if merged_coll_key else []
+                        self._sync_single_citation(
+                            citation, target, existing_items, dry_run, report
+                        )
 
         return report
 
@@ -141,7 +175,7 @@ class ZoteroSyncer:
     def _sync_single_citation(
         self,
         citation: CitationRecord,
-        collection_key: str,
+        collection_keys: list[str],
         existing_items: dict[str, dict],
         dry_run: bool,
         report: SyncReport,
@@ -159,7 +193,7 @@ class ZoteroSyncer:
             return
 
         try:
-            zot_item = self._citation_to_zotero_item(citation, collection_key)
+            zot_item = self._citation_to_zotero_item(citation, collection_keys)
             resp = self.zot.create_items([zot_item])
 
             if resp.get("successful"):
@@ -221,13 +255,24 @@ class ZoteroSyncer:
 
     def _group_citations(
         self, citations: list[CitationRecord]
-    ) -> dict[str, dict[str, list[CitationRecord]]]:
-        """Group citations by ``item_id -> flavor -> [citations]``."""
-        grouped: dict[str, dict[str, list[CitationRecord]]] = {}
+    ) -> dict[str, dict[str, dict[str, list[CitationRecord]]]]:
+        """Group citations by ``item_id -> flavor -> status_bucket -> [citations]``.
+
+        ``status_bucket`` is either ``"active"`` or ``"merged"``.
+        Other statuses (e.g. ``ignored``) are skipped entirely.
+        """
+        grouped: dict[str, dict[str, dict[str, list[CitationRecord]]]] = {}
         for c in citations:
-            if c.citation_status != "active":
+            status = str(c.citation_status) if c.citation_status else "active"
+            if status not in ("active", "merged"):
                 continue
-            grouped.setdefault(c.item_id, {}).setdefault(c.item_flavor, []).append(c)
+            bucket = "merged" if status == "merged" else "active"
+            (
+                grouped.setdefault(c.item_id, {})
+                .setdefault(c.item_flavor, {})
+                .setdefault(bucket, [])
+                .append(c)
+            )
         return grouped
 
     def _get_item_name(self, citations: list[CitationRecord], item_id: str) -> str | None:
@@ -258,7 +303,9 @@ class ZoteroSyncer:
             return resp["successful"]["0"]["key"]
         raise RuntimeError(f"Failed to create collection '{name}': {resp}")
 
-    def _citation_to_zotero_item(self, citation: CitationRecord, collection_key: str) -> dict:
+    def _citation_to_zotero_item(
+        self, citation: CitationRecord, collection_keys: list[str]
+    ) -> dict:
         """Convert a :class:`CitationRecord` to a Zotero item dict."""
         # Determine item type
         item_type = "journalArticle"
@@ -298,7 +345,7 @@ class ZoteroSyncer:
             "date": str(citation.citation_year) if citation.citation_year else "",
             "publicationTitle": citation.citation_journal or "",
             "extra": "\n".join(extra_lines),
-            "collections": [collection_key],
+            "collections": collection_keys,
         }
 
     @staticmethod
