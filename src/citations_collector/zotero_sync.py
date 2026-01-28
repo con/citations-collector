@@ -300,7 +300,7 @@ class ZoteroSyncer:
         payload = {"name": name, "parentCollection": parent_key}
         resp = self.zot.create_collections([payload])
         if resp.get("successful"):
-            return resp["successful"]["0"]["key"]
+            return str(resp["successful"]["0"]["key"])
         raise RuntimeError(f"Failed to create collection '{name}': {resp}")
 
     def _citation_to_zotero_item(

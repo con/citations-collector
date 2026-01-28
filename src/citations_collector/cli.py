@@ -137,7 +137,7 @@ def import_dandi(output: Path, include_draft: bool, limit: int | None) -> None:
 
     importer = DANDIImporter()
 
-    with click.progressbar(length=limit or 0, label="Importing") as bar:
+    with click.progressbar(length=limit or 0, label="Importing") as bar:  # type: ignore[var-annotated]
 
         def progress(current: int, total: int | None) -> None:
             bar.update(1)
@@ -315,16 +315,26 @@ def fetch_pdfs(
     else:
         tsv_path = tsv
     if not output_dir:
-        output_dir = Path(pdfs_cfg.output_dir) if pdfs_cfg else Path("pdfs/")
-    if not email:
-        email = pdfs_cfg.unpaywall_email if pdfs_cfg else "site-unpaywall@oneukrainian.com"
-    if git_annex is None:
-        git_annex = pdfs_cfg.git_annex if pdfs_cfg else False
+        output_dir = Path((pdfs_cfg.output_dir if pdfs_cfg else None) or "pdfs/")
+
+    # Resolve with fallbacks (ensure non-None types for PDFAcquirer)
+    email_resolved: str = (
+        email
+        or (pdfs_cfg.unpaywall_email if pdfs_cfg else None)
+        or "site-unpaywall@oneukrainian.com"
+    )
+    git_annex_resolved: bool = (
+        git_annex
+        if git_annex is not None
+        else ((pdfs_cfg.git_annex if pdfs_cfg else None) or False)
+    )
 
     citations = tsv_io.load_citations(tsv_path)
     click.echo(f"Loaded {len(citations)} citations from {tsv_path}")
 
-    acquirer = PDFAcquirer(output_dir=output_dir, email=email, git_annex=git_annex)
+    acquirer = PDFAcquirer(
+        output_dir=output_dir, email=email_resolved, git_annex=git_annex_resolved
+    )
     counts = acquirer.acquire_all(citations, dry_run=dry_run)
 
     prefix = "[DRY RUN] " if dry_run else ""
