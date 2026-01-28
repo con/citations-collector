@@ -76,9 +76,8 @@ class ZoteroSyncer:
 
         # 4. For each item, ensure collection hierarchy exists
         for item_id, flavors in grouped.items():
-            item_name = self._get_item_name(citations, item_id)
             bare_id = self._strip_prefix(item_id)
-            item_collection_name = f"{bare_id} - {item_name}" if item_name else bare_id
+            item_collection_name = bare_id
 
             # Find or create item-level collection
             item_coll_key = self._find_collection(existing_collections, item_collection_name)
