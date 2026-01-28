@@ -370,17 +370,28 @@ class ZoteroSyncer:
         if citation.citation_source:
             extra_lines.append(f"Discovery Source: {citation.citation_source}")
 
-        return {
+        # Build base item
+        item = {
             "itemType": item_type,
             "title": citation.citation_title or "",
             "creators": creators,
             "DOI": citation.citation_doi or "",
             "url": citation.citation_url or "",
             "date": str(citation.citation_year) if citation.citation_year else "",
-            "publicationTitle": citation.citation_journal or "",
             "extra": "\n".join(extra_lines),
             "collections": collection_keys,
         }
+
+        # Add journal/repository field based on item type
+        if citation.citation_journal:
+            if item_type == "preprint":
+                # Preprints use 'repository' field (e.g., bioRxiv, arXiv)
+                item["repository"] = citation.citation_journal
+            else:
+                # Journal articles and most other types use 'publicationTitle'
+                item["publicationTitle"] = citation.citation_journal
+
+        return item
 
     @staticmethod
     def _make_tracker_key(citation: CitationRecord) -> str:
