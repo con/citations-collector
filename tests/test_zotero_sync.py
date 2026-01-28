@@ -149,6 +149,38 @@ def test_citation_to_zotero_item() -> None:
 
 
 @pytest.mark.ai_generated
+def test_citation_to_zotero_item_preprint_repository_field() -> None:
+    """Verify preprints use 'repository' field instead of 'publicationTitle'."""
+    syncer = _create_syncer()
+    preprint = _make_citation(
+        citation_journal="bioRxiv",
+        citation_type="Preprint",
+    )
+
+    item = syncer._citation_to_zotero_item(preprint, ["COLL_KEY"])
+
+    assert item["itemType"] == "preprint"
+    assert item["repository"] == "bioRxiv"
+    assert "publicationTitle" not in item
+
+
+@pytest.mark.ai_generated
+def test_citation_to_zotero_item_journal_article_publication_title() -> None:
+    """Verify journal articles use 'publicationTitle' field."""
+    syncer = _create_syncer()
+    article = _make_citation(
+        citation_journal="Nature",
+        citation_type=None,  # Defaults to journalArticle
+    )
+
+    item = syncer._citation_to_zotero_item(article, ["COLL_KEY"])
+
+    assert item["itemType"] == "journalArticle"
+    assert item["publicationTitle"] == "Nature"
+    assert "repository" not in item
+
+
+@pytest.mark.ai_generated
 def test_attach_linked_url() -> None:
     """Verify linked URL attachment creation."""
     syncer = _create_syncer()
