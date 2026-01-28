@@ -8,7 +8,9 @@ Discover and curate scholarly citations of datasets and software.
 - **Hierarchical Collections**: Organize citations by project/version (e.g., DANDI dandisets)
 - **Git-Friendly**: YAML collections + TSV citation records for version control
 - **Curation Workflow**: Mark citations as ignored, merge preprints with published versions
-- **Zotero Integration**: Sync citations to Zotero for collaborative browsing
+- **PDF Acquisition**: Automatically download open-access PDFs via Unpaywall with optional git-annex tracking
+- **Merge Detection**: Auto-detect preprints with published versions using CrossRef relationships
+- **Zotero Integration**: Sync citations to hierarchical Zotero collections with automatic merged item relocation
 - **Incremental Updates**: Efficiently discover only new citations since last run
 
 ## Installation
@@ -55,6 +57,121 @@ citations-collector discover collection.yaml --email your@email.org
 ### 3. View Results
 
 Citations are saved to `citations.tsv` - a tab-separated file you can open in Excel or edit manually for curation.
+
+## Advanced Workflows
+
+### PDF Acquisition
+
+Automatically download open-access PDFs using Unpaywall:
+
+```bash
+# Fetch PDFs for discovered citations
+citations-collector fetch-pdfs --config collection.yaml
+
+# Use git-annex for provenance tracking
+citations-collector fetch-pdfs --config collection.yaml --git-annex
+
+# Dry run to see what would be downloaded
+citations-collector fetch-pdfs --config collection.yaml --dry-run
+```
+
+PDFs are stored at `pdfs/{doi}/article.pdf` with accompanying `article.bib` BibTeX files.
+
+### Merge Detection
+
+Detect preprints that have published versions:
+
+```bash
+# Detect merges via CrossRef relationships
+citations-collector detect-merges --config collection.yaml
+
+# Also run fuzzy title matching (use with caution)
+citations-collector detect-merges --config collection.yaml --fuzzy-match
+
+# Preview without updating
+citations-collector detect-merges --config collection.yaml --dry-run
+```
+
+Detected preprints are marked with `citation_status=merged` and `citation_merged_into={published_doi}`.
+
+### Zotero Sync
+
+Sync citations to Zotero for collaborative browsing:
+
+```bash
+# Sync to Zotero (requires API key in config or env)
+citations-collector sync-zotero --config collection.yaml
+
+# Dry run to preview structure
+citations-collector sync-zotero --config collection.yaml --dry-run
+```
+
+Zotero hierarchy:
+```
+Top Collection/
+  ├── {item_id}/
+  │   ├── {flavor}/
+  │   │   ├── <active citations>
+  │   │   └── Merged/
+  │   │       └── <preprints and old versions>
+```
+
+### Unified Configuration
+
+Create a unified `collection.yaml` with all settings:
+
+```yaml
+name: My Research Collection
+description: Tools and datasets from our lab
+
+# Source items to track
+source:
+  items:
+    - item_id: dandi-000055
+      name: "AJILE12: Long-term naturalistic human intracranial neural recordings"
+      flavors:
+        - flavor_id: "0.220113.0400"
+          refs:
+            - ref_type: doi
+              ref_value: "10.48324/dandi.000055/0.220113.0400"
+
+# Citation discovery settings
+discover:
+  sources:
+    - crossref
+    - opencitations
+  email: your@email.org  # For CrossRef polite pool
+  incremental: true
+
+# PDF acquisition settings (optional)
+pdfs:
+  output_dir: pdfs/
+  unpaywall_email: your@email.org
+  git_annex: false
+
+# Zotero sync settings (optional)
+zotero:
+  library_type: group
+  library_id: "12345"
+  api_key: "YOUR_API_KEY"  # Or set ZOTERO_API_KEY env var
+  top_collection_key: "ABCD1234"
+```
+
+Then run the full workflow:
+
+```bash
+# 1. Discover citations
+citations-collector discover collection.yaml
+
+# 2. Fetch open-access PDFs
+citations-collector fetch-pdfs --config collection.yaml
+
+# 3. Detect merged preprints
+citations-collector detect-merges --config collection.yaml
+
+# 4. Sync to Zotero
+citations-collector sync-zotero --config collection.yaml
+```
 
 ## Library Usage
 
@@ -134,7 +251,10 @@ git commit -m "Regenerate LinkML models"
   - `discovery/`: Citation API clients (CrossRef, OpenCitations, DataCite)
   - `persistence/`: YAML/TSV I/O
   - `importers/`: DANDI API, Zenodo, GitHub integrations
-  - `zotero/`: Zotero sync
+  - `unpaywall.py`: Unpaywall API client for OA PDF URLs
+  - `pdf.py`: PDF acquisition with git-annex support
+  - `merge_detection.py`: Preprint/published version detection
+  - `zotero_sync.py`: Zotero hierarchical sync with merged item handling
   - `core.py`: Main orchestration API
   - `cli.py`: Click-based CLI (thin wrapper)
 
