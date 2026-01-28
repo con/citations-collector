@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from citations_collector.models import CitationRecord, Collection
-from citations_collector.zotero_sync import ZoteroSyncer
+from citations_collector.zotero_sync import SyncReport, ZoteroSyncer
 
 
 def _make_citation(**kwargs) -> CitationRecord:
@@ -165,3 +165,117 @@ def test_attach_linked_url() -> None:
     assert attachment["title"] == "My Paper"
     assert attachment["parentItem"] == "PARENT_KEY"
     assert attachment["contentType"] == "application/pdf"
+
+
+@pytest.mark.ai_generated
+def test_move_item_to_collections() -> None:
+    """Verify moving an existing item to different collections."""
+    syncer = _create_syncer()
+    mock_zot = syncer.zot
+
+    existing_item = {
+        "data": {
+            "key": "ITEM_KEY",
+            "version": 5,
+            "title": "Test Paper",
+            "collections": ["OLD_COLL_1", "OLD_COLL_2"],
+        }
+    }
+
+    syncer._move_item_to_collections(existing_item, ["NEW_COLL_1"])
+
+    mock_zot.update_item.assert_called_once()
+    call_args = mock_zot.update_item.call_args[0][0]
+    assert call_args["key"] == "ITEM_KEY"
+    assert call_args["version"] == 5
+    assert call_args["collections"] == ["NEW_COLL_1"]
+
+
+@pytest.mark.ai_generated
+def test_sync_single_citation_moves_to_merged() -> None:
+    """Verify that an existing active item is moved to merged collection."""
+    syncer = _create_syncer()
+    mock_zot = syncer.zot
+
+    citation = CitationRecord(
+        item_id="dataset_001",
+        item_flavor="v1.0",
+        citation_doi="10.1234/test",
+        citation_title="Test Paper",
+        citation_relationship="Cites",
+        citation_source="crossref",
+        citation_status="merged",
+        citation_merged_into="10.1234/published",
+    )
+
+    # Existing item in active collections
+    existing_items = {
+        "dataset_001/v1.0/10.1234/test": {
+            "data": {
+                "key": "EXISTING_KEY",
+                "version": 3,
+                "title": "Test Paper",
+                "collections": ["ACTIVE_COLL_1", "ACTIVE_COLL_2"],
+                "extra": "CitationTracker: dataset_001/v1.0/10.1234/test",
+            }
+        }
+    }
+
+    report = SyncReport()
+
+    # Call with is_merged=True and new collection
+    syncer._sync_single_citation(
+        citation,
+        ["MERGED_COLL"],
+        existing_items,
+        dry_run=False,
+        report=report,
+        is_merged=True,
+    )
+
+    # Should update the item's collections, not create a new item
+    mock_zot.update_item.assert_called_once()
+    assert report.items_updated == 1
+    assert report.items_created == 0
+
+
+@pytest.mark.ai_generated
+def test_sync_single_citation_dry_run_merged_move() -> None:
+    """Verify dry run reports moving merged items correctly."""
+    syncer = _create_syncer()
+
+    citation = CitationRecord(
+        item_id="dataset_001",
+        item_flavor="v1.0",
+        citation_doi="10.1234/test",
+        citation_title="Test Paper",
+        citation_relationship="Cites",
+        citation_source="crossref",
+        citation_status="merged",
+    )
+
+    existing_items = {
+        "dataset_001/v1.0/10.1234/test": {
+            "data": {
+                "key": "EXISTING_KEY",
+                "version": 3,
+                "collections": ["ACTIVE_COLL"],
+                "extra": "CitationTracker: dataset_001/v1.0/10.1234/test",
+            }
+        }
+    }
+
+    report = SyncReport()
+
+    syncer._sync_single_citation(
+        citation,
+        ["MERGED_COLL"],
+        existing_items,
+        dry_run=True,
+        report=report,
+        is_merged=True,
+    )
+
+    # Should report as updated in dry run
+    assert report.items_updated == 1
+    assert report.items_created == 0

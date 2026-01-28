@@ -145,6 +145,7 @@ class ZoteroSyncer:
                         existing_items,
                         dry_run,
                         report,
+                        is_merged=False,
                     )
 
                 # Sync merged citations — only in Merged subcollection
@@ -163,7 +164,7 @@ class ZoteroSyncer:
                     for citation in merged_list:
                         target = [merged_coll_key] if merged_coll_key else []
                         self._sync_single_citation(
-                            citation, target, existing_items, dry_run, report
+                            citation, target, existing_items, dry_run, report, is_merged=True
                         )
 
         return report
@@ -179,14 +180,47 @@ class ZoteroSyncer:
         existing_items: dict[str, dict],
         dry_run: bool,
         report: SyncReport,
+        is_merged: bool = False,
     ) -> None:
-        """Create or skip a single citation item."""
+        """Create or update a single citation item.
+
+        Args:
+            citation: Citation record to sync
+            collection_keys: Target collection keys for this citation
+            existing_items: Dict of existing items by tracker key
+            dry_run: If True, log actions without making API calls
+            report: Sync report to update
+            is_merged: If True, this citation is marked as merged
+        """
         tracker_key = self._make_tracker_key(citation)
 
+        # Check if item already exists
         if tracker_key in existing_items:
-            report.items_skipped += 1
+            existing_item = existing_items[tracker_key]
+            current_collections = existing_item["data"].get("collections", [])
+
+            # If citation is now merged but exists in active collections,
+            # move it to the merged collection
+            if is_merged and set(current_collections) != set(collection_keys):
+                if dry_run:
+                    logger.info(
+                        "    Would move existing item to Merged: %s",
+                        citation.citation_title,
+                    )
+                    report.items_updated += 1
+                else:
+                    try:
+                        self._move_item_to_collections(existing_item, collection_keys)
+                        report.items_updated += 1
+                        logger.info("Moved item to Merged: %s", citation.citation_title)
+                    except Exception as e:
+                        logger.error("Error moving item %s: %s", citation.citation_doi, e)
+                        report.errors.append(f"{citation.citation_doi}: {e}")
+            else:
+                report.items_skipped += 1
             return
 
+        # Create new item
         if dry_run:
             logger.info("    Would create: %s (%s)", citation.citation_title, citation.citation_doi)
             report.items_created += 1
@@ -372,3 +406,33 @@ class ZoteroSyncer:
             self.zot.create_items([attachment])
         except Exception as e:
             logger.warning("Failed to attach URL to %s: %s", parent_key, e)
+
+    def _move_item_to_collections(
+        self, existing_item: dict, new_collection_keys: list[str]
+    ) -> None:
+        """Move an existing Zotero item to different collections.
+
+        Args:
+            existing_item: The existing item dict from Zotero API
+            new_collection_keys: List of collection keys to move the item to
+        """
+        item_key = existing_item["data"]["key"]
+        version = existing_item["data"]["version"]
+
+        # Update the item's collections
+        updated_data = {
+            "key": item_key,
+            "version": version,
+            "collections": new_collection_keys,
+        }
+
+        try:
+            self.zot.update_item(updated_data)
+            logger.info(
+                "Updated collections for item %s: %s",
+                existing_item["data"].get("title", ""),
+                new_collection_keys,
+            )
+        except Exception as e:
+            logger.error("Failed to update item collections: %s", e)
+            raise
