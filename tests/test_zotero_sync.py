@@ -311,3 +311,86 @@ def test_sync_single_citation_dry_run_merged_move() -> None:
     # Should report as updated in dry run
     assert report.items_updated == 1
     assert report.items_created == 0
+
+
+@pytest.mark.ai_generated
+def test_sync_single_citation_adds_related_items() -> None:
+    """Verify that merged items get related items links to published versions."""
+    syncer = _create_syncer()
+    mock_zot = syncer.zot
+
+    # Preprint citation that's been merged
+    preprint = CitationRecord(
+        item_id="dataset_001",
+        item_flavor="v1.0",
+        citation_doi="10.1101/2025.01.01.123456",
+        citation_title="Test Paper (preprint)",
+        citation_relationship="Cites",
+        citation_source="crossref",
+        citation_status="merged",
+        citation_merged_into="10.1234/published",
+    )
+
+    # Both items already exist in Zotero
+    existing_items = {
+        "dataset_001/v1.0/10.1101/2025.01.01.123456": {
+            "data": {
+                "key": "PREPRINT_KEY",
+                "version": 3,
+                "title": "Test Paper (preprint)",
+                "collections": ["ACTIVE_COLL"],
+                "extra": "CitationTracker: dataset_001/v1.0/10.1101/2025.01.01.123456",
+                "relations": {},  # No relations yet
+            }
+        },
+        "dataset_001/v1.0/10.1234/published": {
+            "data": {
+                "key": "PUBLISHED_KEY",
+                "version": 5,
+                "title": "Test Paper (published)",
+                "collections": ["ACTIVE_COLL"],
+                "extra": "CitationTracker: dataset_001/v1.0/10.1234/published",
+                "relations": {},
+            }
+        },
+    }
+
+    # Mock the item() call for refreshing items
+    def mock_item(key: str):
+        if key == "PUBLISHED_KEY":
+            return existing_items["dataset_001/v1.0/10.1234/published"]
+        return existing_items["dataset_001/v1.0/10.1101/2025.01.01.123456"]
+
+    mock_zot.item.side_effect = mock_item
+
+    report = SyncReport()
+
+    # Sync the preprint to Merged collection
+    syncer._sync_single_citation(
+        preprint,
+        ["MERGED_COLL"],
+        existing_items,
+        dry_run=False,
+        report=report,
+        is_merged=True,
+    )
+
+    # Should have moved the item and added at least one relation
+    assert report.items_updated == 1
+    assert mock_zot.update_item.call_count >= 2  # Move + at least one relation
+
+    # Check that update_item was called with relations
+    update_calls = mock_zot.update_item.call_args_list
+
+    # Find the relation updates (they have 'relations' key)
+    relation_updates = [call[0][0] for call in update_calls if "relations" in call[0][0]]
+    assert len(relation_updates) >= 1  # At least one direction
+
+    # Verify at least the preprint got a relation to the published version
+    preprint_update = next((u for u in relation_updates if u["key"] == "PREPRINT_KEY"), None)
+    assert preprint_update is not None
+
+    # Check that the published item URI is in the preprint's relations
+    expected_published_uri = "http://zotero.org/groups/12345/items/PUBLISHED_KEY"
+    preprint_relations = preprint_update.get("relations", {}).get("dc:relation", [])
+    assert expected_published_uri in preprint_relations

@@ -199,23 +199,67 @@ class ZoteroSyncer:
             existing_item = existing_items[tracker_key]
             current_collections = existing_item["data"].get("collections", [])
 
-            # If citation is now merged but exists in active collections,
-            # move it to the merged collection
-            if is_merged and set(current_collections) != set(collection_keys):
-                if dry_run:
-                    logger.info(
-                        "    Would move existing item to Merged: %s",
-                        citation.citation_title,
+            # If citation is merged, handle moving and related items
+            if is_merged:
+                needs_move = set(current_collections) != set(collection_keys)
+                needs_relation = False
+                published_key = None
+
+                # Try to find published version for related items link
+                if citation.citation_merged_into:
+                    published_tracker = self._make_tracker_key_for_doi(
+                        citation.item_id, citation.item_flavor, citation.citation_merged_into
                     )
-                    report.items_updated += 1
-                else:
-                    try:
-                        self._move_item_to_collections(existing_item, collection_keys)
+                    if published_tracker in existing_items:
+                        merged_key = existing_item["data"]["key"]
+                        published_key = existing_items[published_tracker]["data"]["key"]
+
+                        # Check if relation already exists
+                        relations = existing_item["data"].get("relations", {})
+                        dc_relation = relations.get("dc:relation", [])
+                        if isinstance(dc_relation, str):
+                            dc_relation = [dc_relation]
+
+                        published_uri = (
+                            f"http://zotero.org/groups/{self.group_id}/items/{published_key}"
+                        )
+                        needs_relation = published_uri not in dc_relation
+
+                # Update if move or relation needed
+                if needs_move or needs_relation:
+                    if dry_run:
+                        if needs_move:
+                            logger.info(
+                                "    Would move existing item to Merged: %s",
+                                citation.citation_title,
+                            )
+                        if needs_relation:
+                            logger.info(
+                                "    Would add related item link: %s",
+                                citation.citation_title,
+                            )
                         report.items_updated += 1
-                        logger.info("Moved item to Merged: %s", citation.citation_title)
-                    except Exception as e:
-                        logger.error("Error moving item %s: %s", citation.citation_doi, e)
-                        report.errors.append(f"{citation.citation_doi}: {e}")
+                    else:
+                        try:
+                            if needs_move:
+                                self._move_item_to_collections(existing_item, collection_keys)
+                                logger.info("Moved item to Merged: %s", citation.citation_title)
+
+                            if needs_relation and published_key:
+                                # Build items-by-key dict for the relation method
+                                merged_key = existing_item["data"]["key"]
+                                items_by_key = {
+                                    merged_key: existing_item,
+                                    published_key: existing_items[published_tracker],
+                                }
+                                self._add_related_item(merged_key, published_key, items_by_key)
+
+                            report.items_updated += 1
+                        except Exception as e:
+                            logger.error("Error updating item %s: %s", citation.citation_doi, e)
+                            report.errors.append(f"{citation.citation_doi}: {e}")
+                else:
+                    report.items_skipped += 1
             else:
                 report.items_skipped += 1
             return
@@ -401,6 +445,11 @@ class ZoteroSyncer:
             f"/{citation.citation_doi or citation.citation_url or ''}"
         )
 
+    @staticmethod
+    def _make_tracker_key_for_doi(item_id: str, flavor: str, doi: str) -> str:
+        """Create tracker key for a specific DOI."""
+        return f"{item_id}/{flavor}/{doi}"
+
     def _attach_linked_url(self, parent_key: str, url: str, title: str | None = None) -> None:
         """Attach a linked URL to a Zotero item."""
         try:
@@ -447,3 +496,96 @@ class ZoteroSyncer:
         except Exception as e:
             logger.error("Failed to update item collections: %s", e)
             raise
+
+    def _add_related_item(
+        self, item1_key: str, item2_key: str, existing_items_by_key: dict[str, dict]
+    ) -> None:
+        """Add bidirectional 'Related Items' link between two Zotero items.
+
+        Args:
+            item1_key: Zotero key of first item (e.g., merged preprint)
+            item2_key: Zotero key of second item (e.g., published version)
+            existing_items_by_key: Dict of existing items indexed by Zotero key
+        """
+        try:
+            # Get current state of both items
+            item1 = existing_items_by_key.get(item1_key)
+            item2 = existing_items_by_key.get(item2_key)
+
+            if not item1 or not item2:
+                logger.warning(
+                    f"Cannot add relation: item keys not found ({item1_key}, {item2_key})"
+                )
+                return
+
+            # Get current relations
+            relations1 = item1["data"].get("relations", {})
+            relations2 = item2["data"].get("relations", {})
+
+            # Ensure relations are dicts with proper structure
+            if not isinstance(relations1, dict):
+                relations1 = {}
+            if not isinstance(relations2, dict):
+                relations2 = {}
+
+            # Build full item URIs
+            item1_uri = f"http://zotero.org/groups/{self.group_id}/items/{item1_key}"
+            item2_uri = f"http://zotero.org/groups/{self.group_id}/items/{item2_key}"
+
+            # Add item2 to item1's related items (if not already there)
+            dc_relation1 = relations1.get("dc:relation", [])
+            if isinstance(dc_relation1, str):
+                dc_relation1 = [dc_relation1]
+            elif not isinstance(dc_relation1, list):
+                dc_relation1 = []
+
+            if item2_uri not in dc_relation1:
+                dc_relation1.append(item2_uri)
+                relations1["dc:relation"] = dc_relation1
+
+                # Update item1
+                update1 = {
+                    "key": item1_key,
+                    "version": item1["data"]["version"],
+                    "relations": relations1,
+                }
+                self.zot.update_item(update1)
+                logger.info(f"Added related item link: {item1_key} -> {item2_key}")
+
+            # Add item1 to item2's related items (if not already there)
+            dc_relation2 = relations2.get("dc:relation", [])
+            if isinstance(dc_relation2, str):
+                dc_relation2 = [dc_relation2]
+            elif not isinstance(dc_relation2, list):
+                dc_relation2 = []
+
+            if item1_uri not in dc_relation2:
+                dc_relation2.append(item1_uri)
+                relations2["dc:relation"] = dc_relation2
+
+                # Refresh item2 to get latest version (item1 update may have changed it)
+                item2_refreshed = self.zot.item(item2_key)
+                relations2_refreshed = item2_refreshed["data"].get("relations", {})
+                if not isinstance(relations2_refreshed, dict):
+                    relations2_refreshed = {}
+
+                dc_relation2_refreshed = relations2_refreshed.get("dc:relation", [])
+                if isinstance(dc_relation2_refreshed, str):
+                    dc_relation2_refreshed = [dc_relation2_refreshed]
+                elif not isinstance(dc_relation2_refreshed, list):
+                    dc_relation2_refreshed = []
+
+                if item1_uri not in dc_relation2_refreshed:
+                    dc_relation2_refreshed.append(item1_uri)
+                    relations2_refreshed["dc:relation"] = dc_relation2_refreshed
+
+                    update2 = {
+                        "key": item2_key,
+                        "version": item2_refreshed["data"]["version"],
+                        "relations": relations2_refreshed,
+                    }
+                    self.zot.update_item(update2)
+                    logger.info(f"Added related item link: {item2_key} -> {item1_key}")
+
+        except Exception as e:
+            logger.warning(f"Failed to add related items: {e}")
