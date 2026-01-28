@@ -350,5 +350,109 @@ def fetch_pdfs(
         click.echo(f"Updated {tsv_path}")
 
 
+@main.command(name="detect-merges")
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to collection YAML config",
+)
+@click.option(
+    "--tsv",
+    type=click.Path(exists=True, path_type=Path),
+    help="Override: path to TSV file (default: from config)",
+)
+@click.option(
+    "--email",
+    help="Email for CrossRef API (default: from config or fallback)",
+)
+@click.option(
+    "--fuzzy-match",
+    is_flag=True,
+    help="Also perform fuzzy title matching (heuristic, use with caution)",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be marked without saving",
+)
+def detect_merges(
+    config: Path | None,
+    tsv: Path | None,
+    email: str | None,
+    fuzzy_match: bool,
+    dry_run: bool,
+) -> None:
+    """Detect and mark preprints that have published versions.
+
+    Uses CrossRef API to find "is-preprint-of" relationships and marks
+    preprints as merged with citation_status=merged.
+    """
+    from citations_collector import core
+    from citations_collector.merge_detection import MergeDetector
+    from citations_collector.models import generated
+    from citations_collector.persistence import tsv_io
+
+    # Load config if provided
+    pdfs_cfg = None
+    if config:
+        cfg = generated.CollectionConfig.model_validate(core.load_yaml(config))
+        pdfs_cfg = cfg.pdfs
+
+    # Resolve TSV path
+    if not tsv:
+        if not config:
+            raise click.UsageError("Must provide either --config or --tsv")
+        tsv_path = core.get_collection_path(config) / "citations.tsv"
+    else:
+        tsv_path = tsv
+
+    # Resolve email
+    email_resolved: str = (
+        email
+        or (pdfs_cfg.unpaywall_email if pdfs_cfg else None)
+        or "site-unpaywall@oneukrainian.com"
+    )
+
+    citations = tsv_io.load_citations(tsv_path)
+    click.echo(f"Loaded {len(citations)} citations from {tsv_path}")
+
+    detector = MergeDetector(email=email_resolved)
+
+    # Detect merges via CrossRef relationships
+    merged_pairs = detector.detect_merged_pairs(citations)
+    click.echo(f"Found {len(merged_pairs)} merged pairs via CrossRef API")
+
+    # Optionally add fuzzy matching
+    if fuzzy_match:
+        click.echo("Running fuzzy title matching...")
+        fuzzy_pairs = detector.fuzzy_match_by_title(citations)
+        click.echo(f"Found {len(fuzzy_pairs)} potential pairs via fuzzy matching")
+
+        # Show fuzzy matches for manual review
+        if fuzzy_pairs:
+            click.echo("\nFuzzy matches (review before accepting):")
+            for preprint_doi, pub_doi in fuzzy_pairs.items():
+                click.echo(f"  {preprint_doi} -> {pub_doi}")
+
+        # Don't auto-merge fuzzy matches - require manual review
+        click.echo(
+            "\nFuzzy matches not applied automatically. "
+            "Review and add to CrossRef metadata if valid."
+        )
+
+    # Mark merged citations
+    if merged_pairs:
+        prefix = "[DRY RUN] " if dry_run else ""
+        marked = detector.mark_merged_citations(citations, merged_pairs)
+        click.echo(f"{prefix}Marked {marked} citations as merged")
+
+        if not dry_run:
+            tsv_io.save_citations(citations, tsv_path)
+            click.echo(f"Updated {tsv_path}")
+    else:
+        click.echo("No merges detected")
+
+
 if __name__ == "__main__":
     main()
