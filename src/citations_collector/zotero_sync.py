@@ -187,22 +187,38 @@ class ZoteroSyncer:
             return {}
 
     def _fetch_existing_items(self) -> dict[str, dict]:
-        """Fetch all items under the top collection, indexed by tracker key."""
+        """Fetch all items under the top collection tree, indexed by tracker key.
+
+        Walks subcollections recursively since ``collection_items`` only
+        returns items directly in the given collection.
+        """
         items: dict[str, dict] = {}
         try:
-            all_items = self.zot.everything(self.zot.collection_items(self.top_collection_key))
-            for item in all_items:
-                if item["data"].get("itemType") in ("attachment", "note"):
-                    continue
-                extra = item["data"].get("extra", "")
-                for line in extra.split("\n"):
-                    if line.startswith(TRACKER_PREFIX):
-                        tracker_key = line[len(TRACKER_PREFIX) :].strip()
-                        items[tracker_key] = item
-                        break
+            collection_keys = self._collect_all_subcollection_keys(self.top_collection_key)
+            collection_keys.append(self.top_collection_key)
+            for coll_key in collection_keys:
+                coll_items = self.zot.everything(self.zot.collection_items(coll_key))
+                for item in coll_items:
+                    if item["data"].get("itemType") in ("attachment", "note"):
+                        continue
+                    extra = item["data"].get("extra", "")
+                    for line in extra.split("\n"):
+                        if line.startswith(TRACKER_PREFIX):
+                            tracker_key = line[len(TRACKER_PREFIX) :].strip()
+                            items[tracker_key] = item
+                            break
         except Exception as e:
             logger.warning("Error fetching existing items: %s", e)
         return items
+
+    def _collect_all_subcollection_keys(self, parent_key: str) -> list[str]:
+        """Recursively collect all subcollection keys under a parent."""
+        keys: list[str] = []
+        subs = self._fetch_subcollections(parent_key)
+        for key in subs:
+            keys.append(key)
+            keys.extend(self._collect_all_subcollection_keys(key))
+        return keys
 
     def _group_citations(
         self, citations: list[CitationRecord]
