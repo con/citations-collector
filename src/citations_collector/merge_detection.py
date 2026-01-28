@@ -11,6 +11,8 @@ from rapidfuzz import fuzz
 if TYPE_CHECKING:
     from citations_collector.models.generated import CitationRecord
 
+from citations_collector.models.generated import CitationStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -81,12 +83,12 @@ class MergeDetector:
             for rel in is_preprint_of:
                 if "id" in rel:
                     # Extract DOI from the full URL if needed
-                    rel_id = rel["id"]
+                    rel_id = str(rel["id"])
                     if rel_id.startswith("https://doi.org/"):
-                        return rel_id.replace("https://doi.org/", "")
+                        return str(rel_id.replace("https://doi.org/", ""))
                     elif rel_id.startswith("http://dx.doi.org/"):
-                        return rel_id.replace("http://dx.doi.org/", "")
-                    return rel_id
+                        return str(rel_id.replace("http://dx.doi.org/", ""))
+                    return str(rel_id)
 
             # Check if this is a bioRxiv/medRxiv preprint (common case)
             # Sometimes the relationship isn't explicit but the DOI pattern helps
@@ -132,7 +134,7 @@ class MergeDetector:
             url = f"https://api.crossref.org/works/{doi}"
             params = {"mailto": self.email}
             resp = self.session.get(url, params=params, timeout=self.timeout, allow_redirects=False)
-            return resp.status_code == 200
+            return bool(resp.status_code == 200)
         except requests.RequestException:
             return False
 
@@ -151,7 +153,7 @@ class MergeDetector:
         marked_count = 0
         for citation in citations:
             if citation.citation_doi and citation.citation_doi in merged_pairs:
-                citation.citation_status = "merged"
+                citation.citation_status = CitationStatus.merged
                 citation.citation_merged_into = merged_pairs[citation.citation_doi]
                 marked_count += 1
                 logger.info(
@@ -189,7 +191,7 @@ class MergeDetector:
                 continue
 
             best_match = None
-            best_score = 0
+            best_score: float = 0.0
 
             for pub in published:
                 if not pub.citation_title:
@@ -204,7 +206,7 @@ class MergeDetector:
                     best_score = score
                     best_match = pub
 
-            if best_match:
+            if best_match and preprint.citation_doi and best_match.citation_doi:
                 logger.info(
                     f"Fuzzy match found (score {best_score}): "
                     f"{preprint.citation_doi} ~> {best_match.citation_doi}"
