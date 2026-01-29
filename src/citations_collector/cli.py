@@ -70,6 +70,11 @@ def discover(
     collector = CitationCollector.from_yaml(collection)
     cfg = collector.collection
 
+    # Populate items dynamically from source config (e.g., DANDI API)
+    if cfg.source and cfg.source.type:
+        click.echo(f"Populating items from {cfg.source.type} source...")
+        collector.populate_from_source()
+
     # Resolve config: CLI overrides > YAML config > defaults
     discover_cfg = cfg.discover
     if not output:

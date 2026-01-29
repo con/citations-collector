@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -49,6 +50,67 @@ class CitationCollector:
         """
         collection = yaml_io.load_collection(path)
         return cls(collection)
+
+    def populate_from_source(
+        self, progress_callback: Callable[[int, int | None], None] | None = None
+    ) -> None:
+        """
+        Dynamically populate items from source configuration.
+
+        If collection.source is configured (e.g., type="dandi" with dandiset_ids),
+        fetches the items from the source API and adds them to collection.items.
+
+        This allows collections to stay up-to-date without manually maintaining
+        item lists - the items are fetched dynamically at discovery time.
+
+        Args:
+            progress_callback: Optional callback(current, total) for progress reporting
+        """
+        if not self.collection.source or not self.collection.source.type:
+            return
+
+        source_type = self.collection.source.type
+        logger.info(f"Populating items from source: {source_type}")
+
+        if source_type == "dandi":
+            self._populate_from_dandi(progress_callback)
+        else:
+            logger.warning(f"Unknown source type: {source_type}")
+
+    def _populate_from_dandi(
+        self, progress_callback: Callable[[int, int | None], None] | None = None
+    ) -> None:
+        """Populate items from DANDI Archive using source.dandiset_ids."""
+        from citations_collector.importers import DANDIImporter
+
+        if not self.collection.source or not self.collection.source.dandiset_ids:
+            logger.warning("No dandiset_ids specified in source config")
+            return
+
+        dandiset_ids = self.collection.source.dandiset_ids
+        importer = DANDIImporter()
+
+        # Import specific dandisets
+        imported = importer.import_specific(
+            dandiset_ids=dandiset_ids,
+            progress_callback=progress_callback,
+        )
+
+        # Add imported items to collection (avoiding duplicates)
+        if not imported.items:
+            logger.warning("No items imported from DANDI")
+            return
+
+        if not self.collection.items:
+            self.collection.items = []
+
+        existing_ids = {item.item_id for item in self.collection.items}
+        for item in imported.items:
+            if item.item_id not in existing_ids:
+                self.collection.items.append(item)
+                logger.info(f"Added item from DANDI: {item.item_id}")
+            else:
+                logger.debug(f"Skipping duplicate item: {item.item_id}")
 
     def expand_refs(
         self,
