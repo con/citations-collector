@@ -91,9 +91,11 @@ class DataCiteDiscoverer(AbstractDiscoverer):
         self, doi: str, since: datetime | None = None
     ) -> list[CitationRecord]:
         """Query DataCite Event Data API for citation events."""
+        # DataCite requires full DOI URL and uses "references" relation type
+        doi_url = doi if doi.startswith("http") else f"https://doi.org/{doi}"
         params: dict[str, str | int] = {
-            "obj-id": doi,
-            "relation-type-id": "is-referenced-by",
+            "obj-id": doi_url,
+            "relation-type-id": "references",
             "page[size]": 1000,
         }
 
