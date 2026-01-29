@@ -43,6 +43,51 @@ class DANDIImporter:
         # Set a reasonable timeout and user agent
         self.session.headers["User-Agent"] = "citations-collector/0.1"
 
+    def import_specific(
+        self,
+        dandiset_ids: list[str],
+        include_draft: bool = False,
+        progress_callback: Callable[[int, int | None], None] | None = None,
+    ) -> Collection:
+        """
+        Import specific dandisets by their identifiers.
+
+        Args:
+            dandiset_ids: List of dandiset identifiers (e.g., ["000003", "000402"])
+            include_draft: If True, include draft versions without DOIs.
+            progress_callback: Optional callback(current, total) for progress updates.
+
+        Returns:
+            Collection with the specified dandisets and their versions.
+        """
+        items: list[Item] = []
+        total = len(dandiset_ids)
+
+        for idx, dandiset_id in enumerate(dandiset_ids):
+            # Fetch dandiset metadata
+            dandiset = self._fetch_dandiset(dandiset_id)
+            if dandiset is None:
+                logger.warning(f"Dandiset {dandiset_id} not found, skipping")
+                continue
+
+            item = self._dandiset_to_item(dandiset, include_draft=include_draft)
+            if item is not None and item.flavors:
+                items.append(item)
+                logger.debug(f"Imported dandiset {item.item_id} with {len(item.flavors)} versions")
+
+            if progress_callback:
+                progress_callback(idx + 1, total)
+
+        logger.info(f"Imported {len(items)} specific dandisets from DANDI Archive")
+
+        return Collection(
+            name="DANDI Archive",
+            description="Neural data archive with versioned dandisets",
+            homepage="https://dandiarchive.org",
+            source_type="dandi",
+            items=items,
+        )
+
     def import_all(
         self,
         include_draft: bool = False,
@@ -90,6 +135,26 @@ class DANDIImporter:
             source_type="dandi",
             items=items,
         )
+
+    def _fetch_dandiset(self, dandiset_id: str) -> dict | None:
+        """
+        Fetch a single dandiset by ID.
+
+        Args:
+            dandiset_id: The dandiset identifier (e.g., "000003", "000402")
+
+        Returns:
+            Dandiset metadata dictionary or None if not found
+        """
+        url = f"{self.api_url}/dandisets/{dandiset_id}/"
+
+        try:
+            response = self.session.get(url, timeout=60)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch dandiset {dandiset_id}: {e}")
+            return None
 
     def _iter_dandisets(self) -> Iterator[dict]:
         """

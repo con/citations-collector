@@ -1,0 +1,56 @@
+name: MICrONS
+description: >-
+  Machine Intelligence from Cortical Networks (MICrONS) program.
+  A cubic millimeter of mouse visual cortex with dense EM reconstruction,
+  functional imaging, and neural network analysis.
+homepage: https://www.microns-explorer.org/
+
+# Output configuration
+output_tsv: microns-citations.tsv
+
+# Citation discovery configuration
+discover:
+  sources:
+    - crossref
+    - opencitations
+    - datacite
+  email: site-unpaywall@oneukrainian.com
+
+# PDF acquisition configuration
+pdfs:
+  output_dir: microns-pdfs/
+  unpaywall_email: site-unpaywall@oneukrainian.com
+  git_annex: false
+
+# Zotero integration configuration (optional)
+# zotero:
+#   group_id: YOUR_GROUP_ID
+#   collection_key: YOUR_COLLECTION_KEY
+
+# Manual items (paper and BOSS dataset)
+items:
+  - item_id: paper:nature-2025-microns
+    name: >-
+      Functional connectomics spanning multiple areas of mouse visual cortex
+    homepage: https://www.nature.com/articles/s41586-025-08790-w
+    refs:
+      - ref_type: doi
+        ref_value: 10.1038/s41586-025-08790-w
+
+  - item_id: bossdb:microns-minnie65
+    name: >-
+      BOSS Dataset: MICrONS Minnie65 - A cubic millimeter of mouse cortex
+    homepage: https://bossdb.org/project/microns-minnie65
+    refs:
+      - ref_type: doi
+        ref_value: 10.60533/BOSS-2021-T0SY
+
+# NOTE: To include DANDI dandiset 000402, run:
+#   citations-collector import-dandi -o dandi-000402.yaml -d 000402
+#
+# Then merge it into this file:
+#   1. Open both YAML files
+#   2. Copy the dandiset item from dandi-000402.yaml
+#   3. Add it to the items list above
+#
+# Or use the automated workflow (see README for details)

@@ -129,24 +129,78 @@ def discover(
 @click.option(
     "--limit",
     type=int,
-    help="Limit number of dandisets to import",
+    help="Limit number of dandisets to import (only for --all)",
 )
-def import_dandi(output: Path, include_draft: bool, limit: int | None) -> None:
-    """Import all dandisets from DANDI Archive."""
-    click.echo("Importing dandisets from DANDI Archive...")
+@click.option(
+    "--dandiset-id",
+    "-d",
+    "dandiset_ids",
+    multiple=True,
+    help="Import specific dandiset(s) by ID (e.g., -d 000402 -d 000003)",
+)
+@click.option(
+    "--all",
+    "import_all",
+    is_flag=True,
+    help="Import all dandisets (default if no --dandiset-id specified)",
+)
+def import_dandi(
+    output: Path,
+    include_draft: bool,
+    limit: int | None,
+    dandiset_ids: tuple[str, ...],
+    import_all: bool,
+) -> None:
+    """Import dandisets from DANDI Archive.
 
+    Examples:
+
+      # Import specific dandisets
+      citations-collector import-dandi -o microns.yaml -d 000402
+
+      # Import multiple specific dandisets
+      citations-collector import-dandi -o multi.yaml -d 000003 -d 000402
+
+      # Import all dandisets (with limit)
+      citations-collector import-dandi -o all.yaml --all --limit 10
+    """
     importer = DANDIImporter()
 
-    with click.progressbar(length=limit or 0, label="Importing") as bar:  # type: ignore[var-annotated]
+    # Determine what to import
+    if dandiset_ids:
+        # Import specific dandisets
+        click.echo(f"Importing {len(dandiset_ids)} specific dandiset(s)...")
 
-        def progress(current: int, total: int | None) -> None:
-            bar.update(1)
+        with click.progressbar(length=len(dandiset_ids), label="Importing") as bar:  # type: ignore[var-annotated]
 
-        collection = importer.import_all(
-            include_draft=include_draft,
-            limit=limit,
-            progress_callback=progress if limit else None,
-        )
+            def progress(current: int, total: int | None) -> None:
+                bar.update(1)
+
+            collection = importer.import_specific(
+                dandiset_ids=list(dandiset_ids),
+                include_draft=include_draft,
+                progress_callback=progress,
+            )
+    else:
+        # Import all dandisets
+        if not import_all:
+            click.echo(
+                "No --dandiset-id specified, importing all dandisets "
+                "(use --all to suppress this message)"
+            )
+        else:
+            click.echo("Importing all dandisets from DANDI Archive...")
+
+        with click.progressbar(length=limit or 0, label="Importing") as bar:  # type: ignore[var-annotated]
+
+            def progress(current: int, total: int | None) -> None:
+                bar.update(1)
+
+            collection = importer.import_all(
+                include_draft=include_draft,
+                limit=limit,
+                progress_callback=progress if limit else None,
+            )
 
     yaml_io.save_collection(collection, output)
     click.echo(f"Imported {len(collection.items or [])} dandisets to {output}")

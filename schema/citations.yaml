@@ -335,6 +335,11 @@ classes:
         range: integer
       collection_key:
         description: Collection key within the source (if applicable).
+      dandiset_ids:
+        description: >-
+          List of specific DANDI dandiset identifiers to import
+          (e.g., ["000003", "000402"]). If not specified, imports all dandisets.
+        multivalued: true
 
   DiscoverConfig:
     description: >-
