@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sys
 from datetime import (
@@ -25,7 +26,8 @@ from pydantic import (
     SerializationInfo,
     SerializerFunctionWrapHandler,
     field_validator,
-    model_serializer
+    model_serializer,
+    model_validator
 )
 
 
@@ -229,6 +231,10 @@ class CitationSource(str, Enum):
     """
     Discovered via DataCite API.
     """
+    openalex = "openalex"
+    """
+    Discovered via OpenAlex API.
+    """
     europepmc = "europepmc"
     """
     Discovered via Europe PMC API.
@@ -335,8 +341,10 @@ class CitationRecord(ConfiguredBaseModel):
     citation_journal: Optional[str] = Field(default=None, description="""Journal or venue of the citing work.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     citation_relationship: CitationRelationship = Field(default=..., description="""How the citing work relates to the item.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     citation_type: Optional[CitationType] = Field(default=None, description="""Type of the citing work.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    citation_source: CitationSource = Field(default=..., description="""Where this citation was discovered.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    discovered_date: Optional[date] = Field(default=None, description="""When this citation was first discovered (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    citation_source: CitationSource = Field(default=..., description="""DEPRECATED: Use citation_sources instead. Primary discovery source (kept for backward compatibility).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    discovered_date: Optional[date] = Field(default=None, description="""DEPRECATED: Use discovered_dates instead. When this citation was first discovered (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    citation_sources: Optional[list[str]] = Field(default=[], description="""All discovery sources that found this citation. Must be coherent with discovered_dates keys. Example: [\"crossref\", \"openalex\", \"datacite\"]""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    discovered_dates: Optional[str] = Field(default=None, description="""Map of source name to discovery date (ISO 8601). Must be coherent with citation_sources list. Stored as JSON string in TSV. Example: {\"crossref\": \"2025-01-15\", \"openalex\": \"2025-01-20\"}""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     citation_status: CitationStatus = Field(default=CitationStatus.active, description="""Curation status.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'], 'ifabsent': 'string(active)'} })
     citation_merged_into: Optional[str] = Field(default=None, description="""If status is 'merged', the DOI of the canonical version (e.g., published paper DOI when this is a preprint).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     citation_comment: Optional[str] = Field(default=None, description="""Curator notes about this citation.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
@@ -371,6 +379,58 @@ class CitationRecord(ConfiguredBaseModel):
             err_msg = f"Invalid citation_merged_into format: {v}"
             raise ValueError(err_msg)
         return v
+
+    @model_validator(mode='after')
+    def validate_sources_dates_coherence(self):
+        """Validate that citation_sources and discovered_dates are coherent.
+
+        Ensures that:
+        1. All sources in citation_sources have corresponding entries in discovered_dates
+        2. All keys in discovered_dates are present in citation_sources
+        """
+        # Skip validation if neither field is populated
+        if not self.citation_sources and not self.discovered_dates:
+            return self
+
+        # Parse discovered_dates JSON if present
+        dates_dict = {}
+        if self.discovered_dates:
+            try:
+                dates_dict = json.loads(self.discovered_dates)
+                if not isinstance(dates_dict, dict):
+                    raise ValueError(
+                        f"discovered_dates must be a JSON object, got: {type(dates_dict).__name__}"
+                    )
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON in discovered_dates: {e}")
+
+        # Get sources list (default to empty if None)
+        sources_list = self.citation_sources or []
+
+        # Check coherence
+        sources_set = set(sources_list)
+        dates_keys_set = set(dates_dict.keys())
+
+        # Find mismatches
+        missing_in_dates = sources_set - dates_keys_set
+        missing_in_sources = dates_keys_set - sources_set
+
+        errors = []
+        if missing_in_dates:
+            errors.append(
+                f"Sources in citation_sources missing from discovered_dates: {sorted(missing_in_dates)}"
+            )
+        if missing_in_sources:
+            errors.append(
+                f"Keys in discovered_dates missing from citation_sources: {sorted(missing_in_sources)}"
+            )
+
+        if errors:
+            raise ValueError(
+                "citation_sources and discovered_dates must be coherent. " + "; ".join(errors)
+            )
+
+        return self
 
 
 class SourceConfig(ConfiguredBaseModel):
