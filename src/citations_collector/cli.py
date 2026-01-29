@@ -47,7 +47,7 @@ def main(verbose: bool) -> None:
 @click.option(
     "--sources",
     multiple=True,
-    type=click.Choice(["crossref", "opencitations", "datacite"]),
+    type=click.Choice(["crossref", "opencitations", "datacite", "openalex"]),
     help="Which sources to query (overrides discover.sources in YAML)",
 )
 @click.option(

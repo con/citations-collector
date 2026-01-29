@@ -9,6 +9,7 @@ from pathlib import Path
 from citations_collector.discovery import (
     CrossRefDiscoverer,
     DataCiteDiscoverer,
+    OpenAlexDiscoverer,
     OpenCitationsDiscoverer,
 )
 from citations_collector.discovery.utils import deduplicate_citations
@@ -133,7 +134,13 @@ class CitationCollector:
 
         # Initialize discoverers
         discoverers: list[
-            tuple[str, CrossRefDiscoverer | OpenCitationsDiscoverer | DataCiteDiscoverer]
+            tuple[
+                str,
+                CrossRefDiscoverer
+                | OpenCitationsDiscoverer
+                | DataCiteDiscoverer
+                | OpenAlexDiscoverer,
+            ]
         ] = []
         if "crossref" in sources:
             discoverers.append(("crossref", CrossRefDiscoverer(email=email)))
@@ -141,6 +148,8 @@ class CitationCollector:
             discoverers.append(("opencitations", OpenCitationsDiscoverer()))
         if "datacite" in sources:
             discoverers.append(("datacite", DataCiteDiscoverer()))
+        if "openalex" in sources:
+            discoverers.append(("openalex", OpenAlexDiscoverer(email=email)))
 
         # Determine since date for incremental
         since = None
