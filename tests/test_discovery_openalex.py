@@ -9,11 +9,28 @@ from citations_collector.discovery.openalex import OpenAlexDiscoverer
 from citations_collector.models import ItemRef
 
 
+def _mock_doi_resolution(doi: str, openalex_id: str = "W123456789") -> None:
+    """Helper to mock DOI resolution to OpenAlex ID."""
+    responses.add(
+        responses.GET,
+        f"https://api.openalex.org/works/https://doi.org/{doi}",
+        json={
+            "id": f"https://openalex.org/{openalex_id}",
+            "doi": f"https://doi.org/{doi}",
+            "title": "Test Work",
+        },
+        status=200,
+    )
+
+
 @pytest.mark.ai_generated
 @responses.activate
 def test_openalex_success() -> None:
     """Test successful citation discovery from OpenAlex."""
     discoverer = OpenAlexDiscoverer(email="test@example.com")
+
+    # Mock DOI resolution
+    _mock_doi_resolution("10.12345/example-doi", "W123456789")
 
     # Mock OpenAlex response with 2 citing works
     responses.add(
@@ -73,6 +90,9 @@ def test_openalex_empty_results() -> None:
     """Test OpenAlex with no citations found."""
     discoverer = OpenAlexDiscoverer()
 
+    # Mock DOI resolution
+    _mock_doi_resolution("10.12345/no-citations", "W987654321")
+
     responses.add(
         responses.GET,
         "https://api.openalex.org/works",
@@ -91,6 +111,9 @@ def test_openalex_empty_results() -> None:
 def test_openalex_network_error() -> None:
     """Test handling of network errors."""
     discoverer = OpenAlexDiscoverer()
+
+    # Mock DOI resolution
+    _mock_doi_resolution("10.12345/error", "WERROR")
 
     responses.add(
         responses.GET,
@@ -122,6 +145,9 @@ def test_openalex_non_doi_ref() -> None:
 def test_openalex_pagination() -> None:
     """Test cursor-based pagination."""
     discoverer = OpenAlexDiscoverer()
+
+    # Mock DOI resolution
+    _mock_doi_resolution("10.12345/paginated", "WPAGINATED")
 
     # First page
     responses.add(
@@ -178,6 +204,9 @@ def test_openalex_work_type_mapping() -> None:
     """Test mapping of OpenAlex work types to CitationType."""
     discoverer = OpenAlexDiscoverer()
 
+    # Mock DOI resolution
+    _mock_doi_resolution("10.12345/test", "WTEST")
+
     responses.add(
         responses.GET,
         "https://api.openalex.org/works",
@@ -228,6 +257,9 @@ def test_openalex_missing_doi() -> None:
     """Test handling of works without DOI."""
     discoverer = OpenAlexDiscoverer()
 
+    # Mock DOI resolution
+    _mock_doi_resolution("10.12345/test", "WTEST2")
+
     responses.add(
         responses.GET,
         "https://api.openalex.org/works",
@@ -251,6 +283,27 @@ def test_openalex_missing_doi() -> None:
     citations = discoverer.discover(item_ref)
 
     # Should skip work without DOI
+    assert len(citations) == 0
+
+
+@pytest.mark.ai_generated
+@responses.activate
+def test_openalex_doi_resolution_failure() -> None:
+    """Test handling when DOI cannot be resolved to OpenAlex ID."""
+    discoverer = OpenAlexDiscoverer()
+
+    # Mock failed DOI resolution
+    responses.add(
+        responses.GET,
+        "https://api.openalex.org/works/https://doi.org/10.12345/unknown",
+        json={"error": "Work not found"},
+        status=404,
+    )
+
+    item_ref = ItemRef(ref_type="doi", ref_value="10.12345/unknown")
+    citations = discoverer.discover(item_ref)
+
+    # Should return empty list when DOI can't be resolved
     assert len(citations) == 0
 
 

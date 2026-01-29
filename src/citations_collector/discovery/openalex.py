@@ -71,8 +71,14 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
 
         doi = item_ref.ref_value
 
-        # Query OpenAlex for works that cite this DOI
-        # Filter format: cites:https://doi.org/{doi}
+        # First resolve DOI to OpenAlex ID (required for cites: filter)
+        openalex_id = self._resolve_doi_to_id(doi)
+        if not openalex_id:
+            logger.warning(f"Could not resolve DOI {doi} to OpenAlex ID")
+            return []
+
+        # Query OpenAlex for works that cite this work
+        # Filter format: cites:{openalex_id} (e.g., cites:W4409283533)
         citations = []
         cursor = "*"  # OpenAlex uses cursor-based pagination
 
@@ -80,7 +86,7 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
             self._rate_limit()
 
             params: dict[str, Any] = {
-                "filter": f"cites:https://doi.org/{doi}",
+                "filter": f"cites:{openalex_id}",
                 "per-page": 200,  # Max per page
                 "cursor": cursor,
             }
@@ -122,6 +128,38 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
 
         logger.info(f"Found {len(citations)} citations for {doi} via OpenAlex")
         return citations
+
+    def _resolve_doi_to_id(self, doi: str) -> str | None:
+        """
+        Resolve a DOI to its OpenAlex ID.
+
+        Args:
+            doi: The DOI to resolve (e.g., "10.1038/s41586-025-08790-w")
+
+        Returns:
+            OpenAlex ID (e.g., "W4409283533") or None if not found
+        """
+        self._rate_limit()
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/works/https://doi.org/{doi}",
+                timeout=30,
+            )
+            response.raise_for_status()
+            work = response.json()
+
+            # Extract ID from URL (e.g., "https://openalex.org/W4409283533" -> "W4409283533")
+            openalex_url = work.get("id")
+            if openalex_url:
+                openalex_id = openalex_url.split("/")[-1]
+                logger.debug(f"Resolved DOI {doi} to OpenAlex ID {openalex_id}")
+                return openalex_id
+
+        except requests.RequestException as e:
+            logger.warning(f"Failed to resolve DOI {doi} to OpenAlex ID: {e}")
+
+        return None
 
     def _rate_limit(self) -> None:
         """Implement rate limiting to stay under 10 req/sec."""
@@ -168,9 +206,9 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
         pub_year = work.get("publication_year")
 
         # Extract journal/venue
-        primary_location = work.get("primary_location", {})
-        source = primary_location.get("source", {})
-        journal = _sanitize_text(source.get("display_name"))
+        primary_location = work.get("primary_location") or {}
+        source = primary_location.get("source") or {}
+        journal = _sanitize_text(source.get("display_name")) if source else None
 
         # Determine citation type based on work type
         work_type = work.get("type")
