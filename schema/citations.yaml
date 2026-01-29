@@ -293,6 +293,14 @@ classes:
       curated_date:
         description: When the curation decision was made (ISO 8601).
         range: date
+      oa_status:
+        description: >-
+          Open access status from Unpaywall: gold, green, bronze, hybrid,
+          or closed.
+      pdf_url:
+        description: Best open access PDF URL from Unpaywall.
+      pdf_path:
+        description: Relative path to locally stored PDF file.
 
     unique_keys:
       citation_item_key:
@@ -302,6 +310,68 @@ classes:
           - item_id
           - item_flavor
           - citation_doi
+
+  # ---------------------------------------------------------------------------
+  # Config objects for Collection
+  # ---------------------------------------------------------------------------
+  SourceConfig:
+    description: >-
+      Configuration for the item source (e.g., DANDI, Zenodo).
+    attributes:
+      type:
+        description: >-
+          Source type: "dandi", "zenodo_org", "zenodo_collection",
+          "github_org", "yaml", etc.
+      update_items:
+        description: >-
+          How to handle items during import: "add" (only add new items)
+          or "sync" (add new and update existing).
+      include_draft:
+        description: Include draft/unpublished items.
+        range: boolean
+        ifabsent: "false"
+      group_id:
+        description: Numeric group/org ID (if applicable).
+        range: integer
+      collection_key:
+        description: Collection key within the source (if applicable).
+
+  DiscoverConfig:
+    description: >-
+      Configuration for citation discovery.
+    attributes:
+      sources:
+        description: >-
+          List of discovery source names to query
+          (e.g., crossref, opencitations, datacite).
+        multivalued: true
+      email:
+        description: Contact email for API polite pools.
+
+  PdfsConfig:
+    description: >-
+      Configuration for PDF retrieval.
+    attributes:
+      output_dir:
+        description: Directory to store downloaded PDFs.
+        ifabsent: "string(pdfs/)"
+      unpaywall_email:
+        description: Email for Unpaywall API.
+        ifabsent: "string(site-unpaywall@oneukrainian.com)"
+      git_annex:
+        description: Store PDFs in git-annex instead of git.
+        range: boolean
+        ifabsent: "false"
+
+  ZoteroConfig:
+    description: >-
+      Configuration for Zotero integration.
+    attributes:
+      group_id:
+        description: Zotero group library ID.
+        range: integer
+      collection_key:
+        description: Zotero collection key to sync into.
 
   # ---------------------------------------------------------------------------
   # Collection - the root container
@@ -324,17 +394,44 @@ classes:
         multivalued: true
       source_type:
         description: >-
+          DEPRECATED: Use source.type instead.
           Hint for auto-import: "dandi", "zenodo_org", "zenodo_collection",
           "github_org", "yaml", etc.
       source_config:
-        description: Configuration for auto-import (JSON string or nested object).
+        description: >-
+          DEPRECATED: Use source block instead.
+          Configuration for auto-import (JSON string or nested object).
 
-      # Zotero integration
+      # Unified config blocks
+      output_tsv:
+        description: Path to the output TSV file for citations.
+      source:
+        description: Source configuration block.
+        range: SourceConfig
+        inlined: true
+      discover:
+        description: Citation discovery configuration block.
+        range: DiscoverConfig
+        inlined: true
+      pdfs:
+        description: PDF retrieval configuration block.
+        range: PdfsConfig
+        inlined: true
+      zotero:
+        description: Zotero integration configuration block.
+        range: ZoteroConfig
+        inlined: true
+
+      # Zotero integration (deprecated flat fields)
       zotero_group_id:
-        description: Zotero group ID for syncing.
+        description: >-
+          DEPRECATED: Use zotero.group_id instead.
+          Zotero group ID for syncing.
         range: integer
       zotero_collection_key:
-        description: Zotero parent collection key.
+        description: >-
+          DEPRECATED: Use zotero.collection_key instead.
+          Zotero parent collection key.
 
       # Content
       items:

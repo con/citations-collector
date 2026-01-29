@@ -139,8 +139,8 @@ def test_discover_email_env_var(
 
 
 @pytest.mark.ai_generated
-def test_sync_zotero_placeholder(collections_dir: Path) -> None:
-    """Test sync-zotero command placeholder."""
+def test_sync_zotero_requires_config(collections_dir: Path) -> None:
+    """Test sync-zotero requires group-id and collection-key."""
     runner = CliRunner()
 
     result = runner.invoke(
@@ -153,5 +153,5 @@ def test_sync_zotero_placeholder(collections_dir: Path) -> None:
         ],
     )
 
-    assert result.exit_code == 0
-    assert "not yet implemented" in result.output
+    # Should fail: simple.yaml has no zotero config and no --group-id
+    assert result.exit_code != 0

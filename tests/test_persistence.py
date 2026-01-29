@@ -136,3 +136,30 @@ def test_load_citations_example(tsv_dir: Path) -> None:
     merged = [c for c in citations if c.citation_status == "merged"]
     if merged:
         assert merged[0].citation_merged_into is not None
+
+
+@pytest.mark.ai_generated
+def test_tsv_round_trip_oa_fields(tmp_path: Path) -> None:
+    """TSV round-trip preserves oa_status, pdf_url, and pdf_path columns."""
+    from citations_collector.models import CitationRecord
+
+    citation = CitationRecord(
+        item_id="test-item",
+        item_flavor="1.0",
+        citation_doi="10.1234/oa-paper",
+        citation_relationship="Cites",
+        citation_source="crossref",
+        citation_status="active",
+        oa_status="gold",
+        pdf_url="https://example.com/paper.pdf",
+        pdf_path="pdfs/10.1234/oa-paper/article.pdf",
+    )
+
+    tsv_file = tmp_path / "oa_fields.tsv"
+    tsv_io.save_citations([citation], tsv_file)
+    reloaded = tsv_io.load_citations(tsv_file)
+
+    assert len(reloaded) == 1
+    assert reloaded[0].oa_status == "gold"
+    assert reloaded[0].pdf_url == "https://example.com/paper.pdf"
+    assert reloaded[0].pdf_path == "pdfs/10.1234/oa-paper/article.pdf"

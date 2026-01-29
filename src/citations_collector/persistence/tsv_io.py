@@ -32,6 +32,9 @@ TSV_COLUMNS = [
     "citation_comment",
     "curated_by",
     "curated_date",
+    "oa_status",
+    "pdf_url",
+    "pdf_path",
 ]
 
 
