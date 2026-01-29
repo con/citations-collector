@@ -114,6 +114,30 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             )
             citations.append(citation)
 
+        # Warn if Event Data returned events but they didn't yield valid citations
+        if len(events) > 0 and len(citations) == 0:
+            logger.info(
+                f"CrossRef Event Data returned {len(events)} events for {doi} "
+                f"but none were valid DOI-based citations (may be news/blog references)"
+            )
+
+        # Also check metadata API if we got 0 citations total
+        if len(citations) == 0:
+            try:
+                meta_resp = self.session.get(f"https://api.crossref.org/works/{doi}", timeout=10)
+                if meta_resp.status_code == 200:
+                    meta_data = meta_resp.json()
+                    cited_by_count = meta_data.get("message", {}).get("is-referenced-by-count", 0)
+                    if cited_by_count > 0:
+                        logger.warning(
+                            f"CrossRef metadata shows {cited_by_count} citations for {doi}, "
+                            f"but Event Data API has 0 valid citations. "
+                            f"Full cited-by data requires CrossRef membership: "
+                            f"https://www.crossref.org/services/cited-by/"
+                        )
+            except Exception as e:
+                logger.debug(f"Failed to check cited-by count for {doi}: {e}")
+
         return citations
 
     def _fetch_doi_metadata(self, doi: str) -> dict[str, str | int | None]:
