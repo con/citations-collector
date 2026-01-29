@@ -11,6 +11,7 @@ discover:
     - crossref
     - datacite
     - opencitations
+    - openalex
   email: admin@dandiarchive.org
 pdfs:
   output_dir: pdfs/

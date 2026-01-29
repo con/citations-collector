@@ -130,7 +130,7 @@ class CitationCollector:
             email: Email for CrossRef polite pool
         """
         if sources is None:
-            sources = ["crossref", "opencitations", "datacite"]
+            sources = ["crossref", "opencitations", "datacite", "openalex"]
 
         # Initialize discoverers
         discoverers: list[
