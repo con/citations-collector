@@ -1,7 +1,7 @@
 {
     "baseBranch": "master",
-    "name": "citations-collector-bot",
-    "email": "bot@dandiarchive.org",
+    "name": "CON Bot",
+    "email": "bot@centerforopenneuroscience.org",
     "noVersionPrefix": true,
     "plugins": [
         "git-tag",
