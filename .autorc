@@ -4,7 +4,6 @@
     "email": "bot@dandiarchive.org",
     "noVersionPrefix": true,
     "plugins": [
-        "protected-branch",
         "git-tag",
         [
             "exec",
