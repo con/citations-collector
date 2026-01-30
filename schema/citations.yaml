@@ -98,6 +98,8 @@ enums:
         description: Discovered via OpenCitations (OCI) API.
       datacite:
         description: Discovered via DataCite API.
+      openalex:
+        description: Discovered via OpenAlex API.
       europepmc:
         description: Discovered via Europe PMC API.
       semantic_scholar:
@@ -268,12 +270,29 @@ classes:
 
       # Provenance
       citation_source:
-        description: Where this citation was discovered.
+        description: >-
+          DEPRECATED: Use citation_sources instead.
+          Primary discovery source (kept for backward compatibility).
         range: CitationSource
         required: true
       discovered_date:
-        description: When this citation was first discovered (ISO 8601).
+        description: >-
+          DEPRECATED: Use discovered_dates instead.
+          When this citation was first discovered (ISO 8601).
         range: date
+      citation_sources:
+        description: >-
+          All discovery sources that found this citation.
+          Must be coherent with discovered_dates keys.
+          Example: ["crossref", "openalex", "datacite"]
+        multivalued: true
+      discovered_dates:
+        description: >-
+          Map of source name to discovery date (ISO 8601).
+          Must be coherent with citation_sources list.
+          Stored as JSON string in TSV.
+          Example: {"crossref": "2025-01-15", "openalex": "2025-01-20"}
+        range: string
 
       # Curation
       citation_status:

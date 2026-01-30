@@ -14,6 +14,7 @@ discover:
   - crossref
   - opencitations
   - datacite
+  - openalex
   email: site-unpaywall@oneukrainian.com
 pdfs:
   output_dir: microns-pdfs/
@@ -46,4 +47,3 @@ items:
     refs:
     - ref_type: doi
       ref_value: 10.48324/dandi.000402/0.230307.2132
-last_updated: 2026-01-29 12:58:12.884505
