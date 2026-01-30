@@ -152,7 +152,7 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
             # Extract ID from URL (e.g., "https://openalex.org/W4409283533" -> "W4409283533")
             openalex_url = work.get("id")
             if openalex_url:
-                openalex_id = openalex_url.split("/")[-1]
+                openalex_id: str = openalex_url.split("/")[-1]
                 logger.debug(f"Resolved DOI {doi} to OpenAlex ID {openalex_id}")
                 return openalex_id
 

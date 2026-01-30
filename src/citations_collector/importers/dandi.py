@@ -151,7 +151,7 @@ class DANDIImporter:
         try:
             response = self.session.get(url, timeout=60)
             response.raise_for_status()
-            return response.json()
+            return response.json()  # type: ignore[no-any-return]
         except requests.RequestException as e:
             logger.error(f"Failed to fetch dandiset {dandiset_id}: {e}")
             return None
