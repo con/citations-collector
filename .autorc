@@ -1,0 +1,17 @@
+{
+    "baseBranch": "master",
+    "name": "citations-collector-bot",
+    "email": "bot@dandiarchive.org",
+    "noVersionPrefix": true,
+    "plugins": [
+        "protected-branch",
+        "git-tag",
+        [
+            "exec",
+            {
+                "afterRelease": "python -m build && twine upload dist/*"
+            }
+        ],
+        "released"
+    ]
+}
