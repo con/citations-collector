@@ -175,6 +175,14 @@ def test_incremental_date_filtering() -> None:
         status=200,
     )
 
+    # Mock CrossRef Metadata API (called when Event Data returns 0)
+    responses.add(
+        responses.GET,
+        "https://api.crossref.org/works/10.1234/test.dataset",
+        json={"message": {"is-referenced-by-count": 0}},
+        status=200,
+    )
+
     # Create discoverer
     discoverer = CrossRefDiscoverer()
     item_ref = ItemRef(ref_type="doi", ref_value="10.1234/test.dataset")
@@ -183,8 +191,8 @@ def test_incremental_date_filtering() -> None:
     since = datetime(2024, 1, 1)
     discoverer.discover(item_ref, since=since)
 
-    # Should have called API with date filter (from-updated-date for Event Data API)
-    assert len(responses.calls) == 1
+    # Should have called Event Data API with date filter (from-updated-date for Event Data API)
+    assert len(responses.calls) == 2  # Event Data + Metadata
     assert "from-updated-date=2024-01-01" in responses.calls[0].request.url
 
 
