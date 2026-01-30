@@ -1,0 +1,16 @@
+{
+    "baseBranch": "master",
+    "name": "CON Bot",
+    "email": "bot@centerforopenneuroscience.org",
+    "noVersionPrefix": true,
+    "plugins": [
+        "git-tag",
+        [
+            "exec",
+            {
+                "afterRelease": "python -m build && twine upload dist/*"
+            }
+        ],
+        "released"
+    ]
+}
