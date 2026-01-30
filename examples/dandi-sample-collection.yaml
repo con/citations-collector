@@ -7,11 +7,12 @@ source:
   update_items: sync
   include_draft: false
 discover:
-  sources:
-  - crossref
-  - datacite
-  - opencitations
-  - openalex
+  # sources: If not specified, uses all available sources (crossref, opencitations, datacite, openalex)
+  # sources:
+  # - crossref
+  # - datacite
+  # - opencitations
+  # - openalex
   email: admin@dandiarchive.org
 pdfs:
   output_dir: pdfs/
