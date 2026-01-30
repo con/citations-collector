@@ -499,8 +499,6 @@ class Collection(ConfiguredBaseModel):
     zotero_group_id: Optional[int] = Field(default=None, description="""DEPRECATED: Use zotero.group_id instead. Zotero group ID for syncing.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
     zotero_collection_key: Optional[str] = Field(default=None, description="""DEPRECATED: Use zotero.collection_key instead. Zotero parent collection key.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
     items: Optional[list[Item]] = Field(default=[], description="""Items in this collection.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
-    created_date: Optional[date] = Field(default=None, description="""When this collection was created.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection', 'CurationRule']} })
-    last_updated: Optional[datetime ] = Field(default=None, description="""When the collection was last updated.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection']} })
 
 
 class CurationRule(ConfiguredBaseModel):
@@ -516,7 +514,7 @@ class CurationRule(ConfiguredBaseModel):
     target: Optional[str] = Field(default=None, description="""Target for merge actions.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CurationRule']} })
     comment: Optional[str] = Field(default=None, description="""Explanation of why this rule exists.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CurationRule']} })
     created_by: Optional[str] = Field(default=None, description="""Who created this rule.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CurationRule']} })
-    created_date: Optional[date] = Field(default=None, description="""When this rule was created.""", json_schema_extra = { "linkml_meta": {'domain_of': ['Collection', 'CurationRule']} })
+    created_date: Optional[date] = Field(default=None, description="""When this rule was created.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CurationRule']} })
 
 
 class CurationConfig(ConfiguredBaseModel):

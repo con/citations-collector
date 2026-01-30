@@ -176,10 +176,31 @@ class CitationCollector:
                         flavor.refs.append(expanded_ref)
                         existing_ref_values.add(ref_key)
 
+    def _get_most_recent_discovery_date(self) -> datetime | None:
+        """
+        Get the most recent discovery date from existing citations.
+
+        Used for incremental discovery to avoid re-querying old citations.
+
+        Returns:
+            Most recent discovered_date, or None if no citations exist
+        """
+        if not self.citations:
+            return None
+
+        dates = [c.discovered_date for c in self.citations if c.discovered_date]
+        if not dates:
+            return None
+
+        # Convert date to datetime for API compatibility
+        most_recent = max(dates)
+        return datetime.combine(most_recent, datetime.min.time())
+
     def discover_all(
         self,
         sources: list[str] | None = None,
         incremental: bool = True,
+        since_date: datetime | None = None,
         email: str | None = None,
     ) -> None:
         """
@@ -187,8 +208,9 @@ class CitationCollector:
 
         Args:
             sources: Which discoverers to use (default: all available)
-                     Available: "crossref", "opencitations", "datacite"
-            incremental: Use last_updated for date filtering
+                     Available: "crossref", "opencitations", "datacite", "openalex"
+            incremental: Derive since date from existing citations for incremental discovery
+            since_date: Optional explicit since date (overrides incremental)
             email: Email for CrossRef polite pool
         """
         if sources is None:
@@ -214,9 +236,10 @@ class CitationCollector:
             discoverers.append(("openalex", OpenAlexDiscoverer(email=email)))
 
         # Determine since date for incremental
-        since = None
-        if incremental and self.collection.last_updated:
-            since = self.collection.last_updated
+        since = since_date  # Explicit override takes precedence
+        if since is None and incremental:
+            # Derive from existing citations (most recent discovered_date)
+            since = self._get_most_recent_discovery_date()
 
         # Discover citations for all items/flavors/refs
         all_citations = []
@@ -255,9 +278,6 @@ class CitationCollector:
         # Deduplicate and merge with existing
         unique_citations = deduplicate_citations(all_citations)
         self.merge_citations(unique_citations)
-
-        # Update last_updated timestamp
-        self.collection.last_updated = datetime.now()
 
     def load_existing_citations(self, path: Path) -> None:
         """

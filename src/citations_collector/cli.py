@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -40,6 +41,11 @@ def main(verbose: bool) -> None:
     help="Ignore incremental mode (discover all citations)",
 )
 @click.option(
+    "--since",
+    type=click.DateTime(formats=["%Y-%m-%d"]),
+    help="Only discover citations since this date (YYYY-MM-DD). Overrides incremental mode.",
+)
+@click.option(
     "--email",
     envvar="CROSSREF_EMAIL",
     help="Email for CrossRef polite pool (overrides discover.email in YAML)",
@@ -59,6 +65,7 @@ def discover(
     collection: Path,
     output: Path | None,
     full_refresh: bool,
+    since: datetime | None,
     email: str | None,
     sources: tuple[str, ...],
     expand_refs: bool,
@@ -106,6 +113,7 @@ def discover(
     collector.discover_all(
         sources=sources_list,
         incremental=not full_refresh,
+        since_date=since,
         email=email,
     )
 

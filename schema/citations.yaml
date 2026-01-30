@@ -464,14 +464,6 @@ classes:
         multivalued: true
         inlined_as_list: true
 
-      # Metadata
-      created_date:
-        description: When this collection was created.
-        range: date
-      last_updated:
-        description: When the collection was last updated.
-        range: datetime
-
   # ---------------------------------------------------------------------------
   # Curation Rules
   # ---------------------------------------------------------------------------

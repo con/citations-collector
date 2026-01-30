@@ -8,10 +8,10 @@ source:
   include_draft: false
 discover:
   sources:
-    - crossref
-    - datacite
-    - opencitations
-    - openalex
+  - crossref
+  - datacite
+  - opencitations
+  - openalex
   email: admin@dandiarchive.org
 pdfs:
   output_dir: pdfs/

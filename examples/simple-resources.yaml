@@ -1,39 +1,30 @@
-# Example: Simple resources without versioning
-# For tracking citations to a set of papers, datasets, or tools
-
 name: My Project Resources
 description: Key resources used in our research project
 homepage: https://example.org/my-project
-
 items:
-  # A published dataset (no versions)
-  - item_id: my-dataset
-    name: "Neural recordings from experiment X"
-    flavors:
-      - flavor_id: main
-        refs:
-          - ref_type: doi
-            ref_value: "10.1234/my-dataset.2024"
-
-  # A foundational paper
-  - item_id: methods-paper
-    name: "Novel method for neural decoding"
-    flavors:
-      - flavor_id: main
-        refs:
-          - ref_type: doi
-            ref_value: "10.1038/s41592-024-12345"
-          - ref_type: pmid
-            ref_value: "38123456"
-
-  # A software tool (RRID only, no DOI)
-  - item_id: custom-tool
-    name: "CustomAnalysisTool"
-    homepage: https://github.com/myorg/custom-tool
-    flavors:
-      - flavor_id: main
-        refs:
-          - ref_type: rrid
-            ref_value: SCR_999999
-          - ref_type: github
-            ref_value: myorg/custom-tool
+- item_id: my-dataset
+  name: Neural recordings from experiment X
+  flavors:
+  - flavor_id: main
+    refs:
+    - ref_type: doi
+      ref_value: 10.1234/my-dataset.2024
+- item_id: methods-paper
+  name: Novel method for neural decoding
+  flavors:
+  - flavor_id: main
+    refs:
+    - ref_type: doi
+      ref_value: 10.1038/s41592-024-12345
+    - ref_type: pmid
+      ref_value: '38123456'
+- item_id: custom-tool
+  name: CustomAnalysisTool
+  homepage: https://github.com/myorg/custom-tool
+  flavors:
+  - flavor_id: main
+    refs:
+    - ref_type: rrid
+      ref_value: SCR_999999
+    - ref_type: github
+      ref_value: myorg/custom-tool
