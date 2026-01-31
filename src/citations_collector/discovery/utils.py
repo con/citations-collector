@@ -51,10 +51,10 @@ def deduplicate_citations(citations: list[CitationRecord]) -> list[CitationRecor
             if c.citation_source and c.citation_source not in sources:
                 sources.append(c.citation_source)
 
-        # Store sources list if multiple sources found it
-        if len(sources) > 1:
+        # Always set citation_sources to the list (even if single source)
+        if sources:
             citation.citation_sources = sources  # type: ignore[assignment]
-        elif len(sources) == 1:
+            # Keep citation_source set to first source (required field, backward compat)
             citation.citation_source = sources[0]  # type: ignore[assignment]
 
         unique.append(citation)

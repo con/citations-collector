@@ -71,14 +71,15 @@ class PDFAcquirer:
             citation.pdf_path = str(self.output_dir / pdf_path)
             return False
 
-        # Download PDF
-        if self._download(result.best_oa_url, full_path):
-            citation.pdf_path = str(self.output_dir / pdf_path)
+        # Download PDF (or HTML if server returns that)
+        actual_path = self._download(result.best_oa_url, full_path)
+        if actual_path:
+            citation.pdf_path = str(actual_path)
             # Also fetch BibTeX
-            self._fetch_bibtex(citation.citation_doi, full_path.parent / "article.bib")
+            self._fetch_bibtex(citation.citation_doi, actual_path.parent / "article.bib")
             # git-annex
             if self.git_annex:
-                self._annex_addurl(full_path, result.best_oa_url)
+                self._annex_addurl(actual_path, result.best_oa_url)
             return True
         return False
 
@@ -128,22 +129,44 @@ class PDFAcquirer:
         """Convert DOI to relative path: 10.1038/s41597-023-02214-y -> 10.1038/.../article.pdf"""
         return Path(doi) / "article.pdf"
 
-    def _download(self, url: str, dest: Path) -> bool:
-        """Download URL to dest with retry logic. Returns True on success."""
+    def _download(self, url: str, dest: Path) -> Path | None:
+        """
+        Download URL to dest with retry logic and content-type detection.
+
+        If server returns HTML instead of PDF, saves with .html extension.
+        Returns actual path on success, None on failure.
+        """
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
             resp = self.session.get(url, timeout=60, stream=True)
             resp.raise_for_status()
+
+            # Check Content-Type to detect HTML vs PDF
+            content_type = resp.headers.get("Content-Type", "").lower()
+            is_html = any(
+                html_type in content_type
+                for html_type in ["text/html", "application/xhtml+xml", "text/xml"]
+            )
+
+            # If HTML detected, change extension
+            if is_html:
+                dest = dest.with_suffix(".html")
+                logger.warning(
+                    "Server returned HTML instead of PDF for %s, saving as %s",
+                    url,
+                    dest.name,
+                )
+
             with open(dest, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=8192):
                     f.write(chunk)
             logger.info("Downloaded %s", dest)
-            return True
+            return dest
         except requests.RequestException as e:
             logger.warning("Download failed for %s: %s", url, e)
             if dest.exists():
                 dest.unlink()
-            return False
+            return None
 
     def _fetch_bibtex(self, doi: str, dest: Path) -> None:
         """Fetch BibTeX via DOI content negotiation."""

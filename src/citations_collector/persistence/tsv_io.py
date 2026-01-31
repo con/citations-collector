@@ -67,11 +67,10 @@ def load_citations(path: Path) -> list[CitationRecord]:
 
             # Parse citation_source: if it contains commas, it's multiple sources
             if cleaned.get("citation_source") and "," in str(cleaned["citation_source"]):
-                cleaned["citation_sources"] = [
-                    s.strip() for s in cleaned["citation_source"].split(",")
-                ]
-                # Remove citation_source so model uses citation_sources
-                del cleaned["citation_source"]
+                sources = [s.strip() for s in cleaned["citation_source"].split(",")]
+                cleaned["citation_sources"] = sources
+                # Keep citation_source set to first source (required field)
+                cleaned["citation_source"] = sources[0] if sources else cleaned["citation_source"]
 
             # Create CitationRecord, only including fields that are in the model
             citation = CitationRecord(**cleaned)  # type: ignore[arg-type]
