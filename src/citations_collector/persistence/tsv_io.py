@@ -109,13 +109,27 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
             data = citation.model_dump(exclude_none=False, mode="python")
 
             # Serialize citation_sources list to comma-separated string
-            if "citation_sources" in data and data["citation_sources"]:
-                data["citation_sources"] = ", ".join(data["citation_sources"])
+            if "citation_sources" in data:
+                if data["citation_sources"]:
+                    data["citation_sources"] = ", ".join(data["citation_sources"])
+                else:
+                    # Empty list -> empty string (not "[]")
+                    data["citation_sources"] = ""
+
             # Remove citation_source (singular, deprecated field) from output
             if "citation_source" in data:
                 del data["citation_source"]
 
             # Convert None to empty string for TSV
-            cleaned = {k: ("" if v is None else str(v)) for k, v in data.items()}
+            # Also handle empty lists that weren't already converted
+            cleaned = {}
+            for k, v in data.items():
+                if v is None:
+                    cleaned[k] = ""
+                elif isinstance(v, list):
+                    # Should not happen after above processing, but be safe
+                    cleaned[k] = ", ".join(str(x) for x in v) if v else ""
+                else:
+                    cleaned[k] = str(v)
 
             writer.writerow(cleaned)

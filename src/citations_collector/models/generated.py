@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import sys
 from datetime import (
@@ -25,7 +26,8 @@ from pydantic import (
     SerializationInfo,
     SerializerFunctionWrapHandler,
     field_validator,
-    model_serializer
+    model_serializer,
+    model_validator,
 )
 
 
@@ -404,6 +406,50 @@ class CitationRecord(ConfiguredBaseModel):
             err_msg = f"Invalid citation_merged_into format: {v}"
             raise ValueError(err_msg)
         return v
+
+    @model_validator(mode='after')
+    def validate_sources_dates_coherence(self):
+        """Validate that citation_sources and discovered_dates are coherent.
+
+        NOTE: This validator is manually added and must be preserved when
+        regenerating models from schema. LinkML does not yet support
+        cross-field validation rules.
+
+        Validation rules:
+        - If discovered_dates is None/empty: no validation (backward compat)
+        - If discovered_dates is present: must be valid JSON dict matching citation_sources
+        """
+        # Only validate if discovered_dates is actually populated
+        if not self.discovered_dates:
+            return self
+
+        # Parse discovered_dates JSON
+        try:
+            dates_dict = json.loads(self.discovered_dates)
+            if not isinstance(dates_dict, dict):
+                raise ValueError(
+                    f"discovered_dates must be a JSON object, got: {type(dates_dict).__name__}"
+                )
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in discovered_dates: {e}")
+
+        # Enforce coherence between citation_sources and discovered_dates keys
+        sources_set = set(self.citation_sources or [])
+        dates_keys_set = set(dates_dict.keys())
+
+        missing_in_dates = sources_set - dates_keys_set
+        missing_in_sources = dates_keys_set - sources_set
+
+        errors = []
+        if missing_in_dates:
+            errors.append(f"Sources in citation_sources missing from discovered_dates: {sorted(missing_in_dates)}")
+        if missing_in_sources:
+            errors.append(f"Keys in discovered_dates missing from citation_sources: {sorted(missing_in_sources)}")
+
+        if errors:
+            raise ValueError("citation_sources and discovered_dates must be coherent. " + "; ".join(errors))
+
+        return self
 
 
 class SourceConfig(ConfiguredBaseModel):
