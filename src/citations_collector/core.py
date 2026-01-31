@@ -181,29 +181,28 @@ class CitationCollector:
             return
 
         # Handle update_items setting
+        bib_items = bib_collection.items or []
         if source.update_items == "sync":
             # Replace all items with BibTeX items
-            self.collection.items = bib_collection.items
-            logger.info(f"Synced {len(bib_collection.items)} items from BibTeX")
+            self.collection.items = bib_items
+            logger.info(f"Synced {len(bib_items)} items from BibTeX")
         elif source.update_items == "add":
             # Add only new items (by item_id)
             if not self.collection.items:
                 self.collection.items = []
             existing_ids = {item.item_id for item in self.collection.items}
-            new_items = [item for item in bib_collection.items if item.item_id not in existing_ids]
+            new_items = [item for item in bib_items if item.item_id not in existing_ids]
             self.collection.items.extend(new_items)
             logger.info(f"Added {len(new_items)} new items from BibTeX")
         else:
             # update_items: false/omitted - don't modify YAML, just use BibTeX items for discovery
             # Replace items temporarily for discovery, but won't be saved to YAML
-            self.collection.items = bib_collection.items
+            self.collection.items = bib_items
             self._skip_yaml_save = True  # Don't save YAML - items maintained externally
-            logger.info(
-                f"Loaded {len(bib_collection.items)} items from BibTeX (not saving to YAML)"
-            )
+            logger.info(f"Loaded {len(bib_items)} items from BibTeX (not saving to YAML)")
 
         if progress_callback:
-            progress_callback(len(bib_collection.items), len(bib_collection.items))
+            progress_callback(len(bib_items), len(bib_items))
 
     def expand_refs(
         self,

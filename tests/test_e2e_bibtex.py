@@ -22,10 +22,11 @@ def test_e2e_bibtex_workflow(tmp_path: Path) -> None:
     """
     # Step 1: Create BibTeX file
     bib_file = tmp_path / "references.bib"
-    bib_file.write_text("""
+    bib_file.write_text(
+        """
 @misc{dandi_000003,
     title = {Hippocampal Granule Cells Dataset},
-    author = {Senzai, Yuta and Buzsáki, György},
+    author = {Senzai, Yuta and Buzsaki, Gyorgy},
     year = {2021},
     doi = {10.48324/dandi.000003/0.210812.1448},
     publisher = {DANDI Archive}
@@ -38,11 +39,14 @@ def test_e2e_bibtex_workflow(tmp_path: Path) -> None:
     doi = {10.48324/dandi.000004/0.210831.2033},
     publisher = {DANDI Archive}
 }
-""")
+""",
+        encoding="utf-8",
+    )
 
     # Step 2: Create collection YAML
     collection_yaml = tmp_path / "collection.yaml"
-    collection_yaml.write_text("""
+    collection_yaml.write_text(
+        """
 name: Test DANDI Collection
 description: Testing BibTeX source integration
 
@@ -59,7 +63,9 @@ discover:
   email: test@example.com
 
 output_tsv: citations.tsv
-""")
+""",
+        encoding="utf-8",
+    )
 
     # Step 3: Load collection
     collection = yaml_io.load_collection(collection_yaml)
@@ -104,15 +110,19 @@ def test_e2e_bibtex_relative_path_resolution(tmp_path: Path) -> None:
 
     # BibTeX in data directory
     bib_file = data_dir / "refs.bib"
-    bib_file.write_text("""
+    bib_file.write_text(
+        """
 @misc{test1,
     doi = {10.48324/dandi.000003/0.210812.1448}
 }
-""")
+""",
+        encoding="utf-8",
+    )
 
     # Collection YAML in config directory, referencing ../data/refs.bib
     collection_yaml = config_dir / "collection.yaml"
-    collection_yaml.write_text("""
+    collection_yaml.write_text(
+        """
 name: Test Collection
 source:
   type: bibtex
@@ -121,7 +131,9 @@ source:
   ref_type: doi
   ref_regex: '10\\.48324/(?P<item_id>dandi\\.\\d{6})/(?P<flavor_id>[\\d.]+)'
 items: []
-""")
+""",
+        encoding="utf-8",
+    )
 
     # Load and populate
     collection = yaml_io.load_collection(collection_yaml)

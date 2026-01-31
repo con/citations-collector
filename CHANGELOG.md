@@ -1,3 +1,62 @@
+# 0.2.3 (Fri Jan 31 2026)
+
+#### 🚀 Enhancement
+
+- BibTeX source type - Import items from external BibTeX files with regex-based parsing for item_id/flavor_id extraction
+- Multi-source citation deduplication - Merge citations found by multiple discoverers into single TSV rows with comma-separated sources
+- PDF download improvements - Retry logic with Retry-After header support and exponential backoff for bioRxiv rate limiting
+- Progress bars - Real-time progress monitoring with tqdm for long-running discovery tasks
+- HTML detection - Automatically detect and save HTML responses with correct extension when servers return HTML instead of PDF
+
+#### 🐛 Bug Fix
+
+- Rename TSV column from citation_source to citation_sources (plural) for clarity
+- Fix re-download prevention - Check both .pdf and .html extensions before downloading
+- Fix TSV backward compatibility - Support both old citation_source and new citation_sources columns
+- Add default citation_source value - Use "manual" for TSV files missing source field
+- Improve logging with tqdm - Use logging_redirect_tqdm() for better real-time output
+
+#### 📝 Documentation
+
+- Update README with BibTeX source type examples and configuration
+- Add real-world use case documentation - DANDI Archive (850+ dandisets), MICrONS, StudyForrest, ReproNim
+- Document multi-source tracking - Explain comma-separated citation_sources format
+- Add reference to dandi-bib complete pipeline for DANDI production setup
+- Document PDF acquisition features - Retry logic, HTML detection, rate limiting
+
+#### 🏠 Internal
+
+- Add comprehensive tests for PDF retry logic - Unit tests with mocks and integration tests with real bioRxiv downloads
+- Add cross-field validation - Pydantic model validator for citation_sources/discovered_dates coherence
+- Improve rate limiting - 2-second delay between downloads, configurable download_delay parameter
+- Fix test compatibility - Handle missing citation_source field in TSV files gracefully
+
+#### ⚠️ Pushed to `master`
+
+- Add reference to dandi-bib complete pipeline in README ([@yarikoptic](https://github.com/yarikoptic))
+- Update README with BibTeX source, multi-source tracking, real examples ([@yarikoptic](https://github.com/yarikoptic))
+- Add comprehensive tests for PDF retry logic and bioRxiv downloads ([@yarikoptic](https://github.com/yarikoptic))
+- Improve PDF download retry logic and rate limiting for bioRxiv ([@yarikoptic](https://github.com/yarikoptic))
+- Rename TSV column from citation_source to citation_sources ([@yarikoptic](https://github.com/yarikoptic))
+- Simplify tqdm logging with logging_redirect_tqdm ([@yarikoptic](https://github.com/yarikoptic))
+- Fix tqdm progress bar to show logging in real-time ([@yarikoptic](https://github.com/yarikoptic))
+- Fix multi-source citation handling and PDF/HTML detection ([@yarikoptic](https://github.com/yarikoptic))
+- Store multi-source citations as single TSV row ([@yarikoptic](https://github.com/yarikoptic))
+- Improve reporting: group by DOI and show all discovery sources ([@yarikoptic](https://github.com/yarikoptic))
+- Centralize citation count reporting and fix progress bar ([@yarikoptic](https://github.com/yarikoptic))
+- Fix BibTeX source to not save items to YAML when update_items is omitted ([@yarikoptic](https://github.com/yarikoptic))
+- Document per-source incremental discovery TODO ([@yarikoptic](https://github.com/yarikoptic))
+- Add tqdm progress bar, improve logging, and add retry logic ([@yarikoptic](https://github.com/yarikoptic))
+- Add debug logging and fix Makefile to use --full-refresh ([@yarikoptic](https://github.com/yarikoptic))
+- Fix BibTeX importer to properly group flavors by item_id ([@yarikoptic](https://github.com/yarikoptic))
+- Add BibTeX source type for external item management ([@yarikoptic](https://github.com/yarikoptic))
+
+#### Authors: 1
+
+- Yaroslav Halchenko ([@yarikoptic](https://github.com/yarikoptic))
+
+---
+
 # 0.2.2 (Fri Jan 30 2026)
 
 #### 🐛 Bug Fix

@@ -31,7 +31,7 @@ def deduplicate_citations(citations: list[CitationRecord]) -> list[CitationRecor
         Deduplicated list with sources merged
     """
     # Group citations by unique key
-    grouped: dict[tuple[str, str, str], list[CitationRecord]] = {}
+    grouped: dict[tuple[str, str, str | None], list[CitationRecord]] = {}
 
     for citation in citations:
         key = (citation.item_id, citation.item_flavor, citation.citation_doi)

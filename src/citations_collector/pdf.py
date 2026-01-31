@@ -4,16 +4,60 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
+from collections.abc import Mapping
 from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
+from requests.models import PreparedRequest, Response
 from urllib3.util.retry import Retry
 
 from citations_collector.models import CitationRecord
 from citations_collector.unpaywall import UnpaywallClient
 
 logger = logging.getLogger(__name__)
+
+
+class RetryAfterAdapter(HTTPAdapter):
+    """HTTPAdapter that respects Retry-After header from server."""
+
+    def send(
+        self,
+        request: PreparedRequest,
+        stream: bool = False,
+        timeout: float | tuple[float, float] | tuple[float, None] | None = None,
+        verify: bool | str = True,
+        cert: bytes | str | tuple[bytes | str, bytes | str] | None = None,
+        proxies: Mapping[str, str] | None = None,
+    ) -> Response:
+        """Send request with Retry-After header support."""
+        response = super().send(
+            request,
+            stream=stream,
+            timeout=timeout,
+            verify=verify,
+            cert=cert,
+            proxies=proxies,
+        )
+
+        # Check for Retry-After header on 429/503 responses
+        if response.status_code in (429, 503):
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    # Retry-After can be seconds (int) or HTTP date
+                    delay = int(retry_after)
+                    logger.warning(
+                        f"Rate limited by {request.url}, waiting {delay}s (Retry-After header)"
+                    )
+                    time.sleep(delay)
+                except ValueError:
+                    # HTTP date format - default to 60s
+                    logger.warning(f"Rate limited by {request.url}, waiting 60s")
+                    time.sleep(60)
+
+        return response
 
 
 class PDFAcquirer:
@@ -37,15 +81,21 @@ class PDFAcquirer:
         )
 
         # Retry on 403, 429, 500, 502, 503, 504 with exponential backoff
+        # Longer backoff for bioRxiv/Cloudflare protection: 2s, 6s, 18s, 54s
         retry_strategy = Retry(
-            total=3,
-            backoff_factor=1,  # 1s, 2s, 4s
+            total=4,
+            backoff_factor=3,  # 3^0=1s, 3^1=3s, 3^2=9s, 3^3=27s (with backoff_factor multiplier)
             status_forcelist=[403, 429, 500, 502, 503, 504],
             allowed_methods=["GET", "HEAD"],
+            respect_retry_after_header=True,  # Respect Retry-After from server
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
+        adapter = RetryAfterAdapter(max_retries=retry_strategy)
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
+
+        # Rate limiting: delay between downloads to avoid triggering Cloudflare
+        self._last_download_time = 0.0
+        self._download_delay = 2.0  # 2 seconds between downloads
 
     def acquire_for_citation(self, citation: CitationRecord, dry_run: bool = False) -> bool:
         """Look up OA status, download PDF if available. Returns True if PDF was acquired."""
@@ -65,10 +115,17 @@ class PDFAcquirer:
             logger.info("Would download %s -> %s", citation.citation_doi, pdf_path)
             return False
 
-        # Skip if already downloaded
+        # Skip if already downloaded (check both .pdf and .html extensions)
         full_path = self.output_dir / pdf_path
+        html_path = full_path.with_suffix(".html")
+
         if full_path.exists():
-            citation.pdf_path = str(self.output_dir / pdf_path)
+            citation.pdf_path = str(full_path)
+            logger.debug(f"PDF already exists: {full_path}")
+            return False
+        if html_path.exists():
+            citation.pdf_path = str(html_path)
+            logger.debug(f"HTML already exists: {html_path}")
             return False
 
         # Download PDF (or HTML if server returns that)
@@ -136,8 +193,14 @@ class PDFAcquirer:
         If server returns HTML instead of PDF, saves with .html extension.
         Returns actual path on success, None on failure.
         """
+        # Rate limiting: wait between downloads to avoid triggering Cloudflare
+        elapsed = time.time() - self._last_download_time
+        if elapsed < self._download_delay:
+            time.sleep(self._download_delay - elapsed)
+
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
+            self._last_download_time = time.time()
             resp = self.session.get(url, timeout=60, stream=True)
             resp.raise_for_status()
 
