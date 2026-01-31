@@ -22,7 +22,10 @@ from pydantic import (
     ConfigDict,
     Field,
     RootModel,
-    field_validator
+    SerializationInfo,
+    SerializerFunctionWrapHandler,
+    field_validator,
+    model_serializer
 )
 
 
@@ -32,6 +35,8 @@ version = "0.2.0"
 
 class ConfiguredBaseModel(BaseModel):
     model_config = ConfigDict(
+        serialize_by_alias = True,
+        validate_by_name = True,
         validate_assignment = True,
         validate_default = True,
         extra = "forbid",
@@ -39,8 +44,20 @@ class ConfiguredBaseModel(BaseModel):
         use_enum_values = True,
         strict = False,
     )
-    pass
 
+    @model_serializer(mode='wrap', when_used='unless-none')
+    def treat_empty_lists_as_none(
+            self, handler: SerializerFunctionWrapHandler,
+            info: SerializationInfo) -> dict[str, Any]:
+        if info.exclude_none:
+            _instance = self.model_copy()
+            for field, field_info in type(_instance).model_fields.items():
+                if getattr(_instance, field) == [] and not(
+                        field_info.is_required()):
+                    setattr(_instance, field, None)
+        else:
+            _instance = self
+        return handler(_instance, info)
 
 
 
@@ -73,8 +90,16 @@ linkml_meta = LinkMLMeta({'default_prefix': 'citations',
      'name': 'citations-collector',
      'prefixes': {'citations': {'prefix_prefix': 'citations',
                                 'prefix_reference': 'https://w3id.org/dandi/citations-collector/'},
+                  'cito': {'prefix_prefix': 'cito',
+                           'prefix_reference': 'http://purl.org/spar/cito/'},
                   'datacite': {'prefix_prefix': 'datacite',
                                'prefix_reference': 'https://purl.org/datacite/v4.4/'},
+                  'dcterms': {'prefix_prefix': 'dcterms',
+                              'prefix_reference': 'http://purl.org/dc/terms/'},
+                  'fabio': {'prefix_prefix': 'fabio',
+                            'prefix_reference': 'http://purl.org/spar/fabio/'},
+                  'foaf': {'prefix_prefix': 'foaf',
+                           'prefix_reference': 'http://xmlns.com/foaf/0.1/'},
                   'linkml': {'prefix_prefix': 'linkml',
                              'prefix_reference': 'https://w3id.org/linkml/'},
                   'schema': {'prefix_prefix': 'schema',
@@ -126,7 +151,7 @@ class RefType(str, Enum):
 
 class CitationRelationship(str, Enum):
     """
-    The relationship between a citing work and the cited item.
+    The relationship between a citing work and the cited item. Aligned with CiTO (Citation Typing Ontology) and DataCite relationship types.
     """
     Cites = "Cites"
     """
@@ -160,7 +185,7 @@ class CitationRelationship(str, Enum):
 
 class CitationType(str, Enum):
     """
-    The type of citing work.
+    The type of citing work. Aligned with FaBiO (FRBR-aligned Bibliographic Ontology) and schema.org types.
     """
     Publication = "Publication"
     """
@@ -263,220 +288,5 @@ class ItemRef(ConfiguredBaseModel):
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
 
-    ref_type: RefType = Field(default=..., description="""Type of identifier.""", json_schema_extra = { "linkml_meta": {'alias': 'ref_type', 'domain_of': ['ItemRef', 'SourceConfig']} })
-    ref_value: str = Field(default=..., description="""The identifier value. Format depends on ref_type: - doi: \"10.1234/example\" (without doi: prefix) - rrid: \"SCR_016216\" (without RRID: prefix) - arxiv: \"2301.12345\" - pmid: \"12345678\" - url: full URL - zenodo: record ID like \"852659\" - github: \"owner/repo\"""", json_schema_extra = { "linkml_meta": {'alias': 'ref_value', 'domain_of': ['ItemRef']} })
-    ref_url: Optional[str] = Field(default=None, description="""Resolved URL for this reference (auto-populated).""", json_schema_extra = { "linkml_meta": {'alias': 'ref_url', 'domain_of': ['ItemRef']} })
-
-
-class ItemFlavor(ConfiguredBaseModel):
-    """
-    A specific version or variant of an item. For versioned resources (software releases, dataset versions), each version is a flavor. For unversioned resources, use a single flavor (e.g., \"latest\" or \"main\").
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    flavor_id: str = Field(default=..., description="""Identifier for this flavor (e.g., \"0.210812.1448\", \"23.1.0\", \"latest\"). Use \"main\" or omit for unversioned items.""", json_schema_extra = { "linkml_meta": {'alias': 'flavor_id', 'domain_of': ['ItemFlavor']} })
-    name: Optional[str] = Field(default=None, description="""Human-readable name for this flavor.""", json_schema_extra = { "linkml_meta": {'alias': 'name', 'domain_of': ['ItemFlavor', 'Item', 'Collection']} })
-    release_date: Optional[date] = Field(default=None, description="""When this flavor was released (ISO 8601).""", json_schema_extra = { "linkml_meta": {'alias': 'release_date', 'domain_of': ['ItemFlavor']} })
-    refs: list[ItemRef] = Field(default=..., description="""Resolvable identifiers for this flavor. Multiple refs allowed (e.g., both DOI and RRID for the same version).""", json_schema_extra = { "linkml_meta": {'alias': 'refs', 'domain_of': ['ItemFlavor']} })
-    citations: Optional[list[CitationRecord]] = Field(default=None, description="""Citations discovered for this flavor.""", json_schema_extra = { "linkml_meta": {'alias': 'citations', 'domain_of': ['ItemFlavor']} })
-
-
-class Item(ConfiguredBaseModel):
-    """
-    A tracked resource with one or more flavors (versions). The item_id can encode hierarchy using \":\" separator (e.g., \"dandi:000003\", \"repronim:fmriprep\", or just \"my-tool\").
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    item_id: str = Field(default=..., description="""Unique identifier for this item within the collection. May include namespace prefix with \":\" (e.g., \"dandi:000003\"). The part before \":\" indicates the source/project.""", json_schema_extra = { "linkml_meta": {'alias': 'item_id', 'domain_of': ['Item', 'CitationRecord']} })
-    name: Optional[str] = Field(default=None, description="""Human-readable name.""", json_schema_extra = { "linkml_meta": {'alias': 'name', 'domain_of': ['ItemFlavor', 'Item', 'Collection']} })
-    description: Optional[str] = Field(default=None, description="""Description of the item.""", json_schema_extra = { "linkml_meta": {'alias': 'description', 'domain_of': ['Item', 'Collection']} })
-    homepage: Optional[str] = Field(default=None, description="""URL to the item's homepage or landing page.""", json_schema_extra = { "linkml_meta": {'alias': 'homepage', 'domain_of': ['Item', 'Collection']} })
-    flavors: list[ItemFlavor] = Field(default=..., description="""Versions/variants of this item.""", json_schema_extra = { "linkml_meta": {'alias': 'flavors', 'domain_of': ['Item']} })
-
-
-class CitationRecord(ConfiguredBaseModel):
-    """
-    A record representing a citation relationship between a citing work and a tracked item. Each row in the citations TSV.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector',
-         'unique_keys': {'citation_item_key': {'description': 'Unique key: each citing '
-                                                              'work (by DOI or URL) is '
-                                                              'unique per item+flavor.',
-                                               'unique_key_name': 'citation_item_key',
-                                               'unique_key_slots': ['item_id',
-                                                                    'item_flavor',
-                                                                    'citation_doi']}}})
-
-    item_id: str = Field(default=..., description="""ID of the tracked item being cited.""", json_schema_extra = { "linkml_meta": {'alias': 'item_id', 'domain_of': ['Item', 'CitationRecord']} })
-    item_flavor: str = Field(default=..., description="""Flavor (version) of the item being cited.""", json_schema_extra = { "linkml_meta": {'alias': 'item_flavor', 'domain_of': ['CitationRecord']} })
-    item_ref_type: Optional[RefType] = Field(default=None, description="""Which ref type was matched for this citation.""", json_schema_extra = { "linkml_meta": {'alias': 'item_ref_type', 'domain_of': ['CitationRecord']} })
-    item_ref_value: Optional[str] = Field(default=None, description="""Which ref value was matched for this citation.""", json_schema_extra = { "linkml_meta": {'alias': 'item_ref_value', 'domain_of': ['CitationRecord']} })
-    item_name: Optional[str] = Field(default=None, description="""Human-readable name of the item (for display).""", json_schema_extra = { "linkml_meta": {'alias': 'item_name', 'domain_of': ['CitationRecord']} })
-    citation_doi: Optional[str] = Field(default=None, description="""DOI of the citing work (primary identifier).""", json_schema_extra = { "linkml_meta": {'alias': 'citation_doi', 'domain_of': ['CitationRecord']} })
-    citation_pmid: Optional[str] = Field(default=None, description="""PubMed ID of the citing work.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_pmid', 'domain_of': ['CitationRecord']} })
-    citation_arxiv: Optional[str] = Field(default=None, description="""arXiv ID of the citing work.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_arxiv', 'domain_of': ['CitationRecord']} })
-    citation_url: Optional[str] = Field(default=None, description="""URL to the citing work (fallback if no DOI).""", json_schema_extra = { "linkml_meta": {'alias': 'citation_url', 'domain_of': ['CitationRecord']} })
-    citation_title: Optional[str] = Field(default=None, description="""Title of the citing work.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_title', 'domain_of': ['CitationRecord']} })
-    citation_authors: Optional[str] = Field(default=None, description="""Authors of the citing work (semicolon-separated).""", json_schema_extra = { "linkml_meta": {'alias': 'citation_authors', 'domain_of': ['CitationRecord']} })
-    citation_year: Optional[int] = Field(default=None, description="""Publication year of the citing work.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_year', 'domain_of': ['CitationRecord']} })
-    citation_journal: Optional[str] = Field(default=None, description="""Journal or venue of the citing work.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_journal', 'domain_of': ['CitationRecord']} })
-    citation_relationship: CitationRelationship = Field(default=..., description="""How the citing work relates to the item.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_relationship', 'domain_of': ['CitationRecord']} })
-    citation_type: Optional[CitationType] = Field(default=None, description="""Type of the citing work.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_type', 'domain_of': ['CitationRecord']} })
-    citation_source: CitationSource = Field(default=..., description="""DEPRECATED: Use citation_sources instead. Primary discovery source (kept for backward compatibility).""", json_schema_extra = { "linkml_meta": {'alias': 'citation_source', 'domain_of': ['CitationRecord']} })
-    discovered_date: Optional[date] = Field(default=None, description="""DEPRECATED: Use discovered_dates instead. When this citation was first discovered (ISO 8601).""", json_schema_extra = { "linkml_meta": {'alias': 'discovered_date', 'domain_of': ['CitationRecord']} })
-    citation_sources: Optional[list[str]] = Field(default=None, description="""All discovery sources that found this citation. Must be coherent with discovered_dates keys. Example: [\"crossref\", \"openalex\", \"datacite\"]""", json_schema_extra = { "linkml_meta": {'alias': 'citation_sources', 'domain_of': ['CitationRecord']} })
-    discovered_dates: Optional[str] = Field(default=None, description="""Map of source name to discovery date (ISO 8601). Must be coherent with citation_sources list. Stored as JSON string in TSV. Example: {\"crossref\": \"2025-01-15\", \"openalex\": \"2025-01-20\"}""", json_schema_extra = { "linkml_meta": {'alias': 'discovered_dates', 'domain_of': ['CitationRecord']} })
-    citation_status: CitationStatus = Field(default='active', description="""Curation status.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_status',
-         'domain_of': ['CitationRecord'],
-         'ifabsent': 'string(active)'} })
-    citation_merged_into: Optional[str] = Field(default=None, description="""If status is 'merged', the DOI of the canonical version (e.g., published paper DOI when this is a preprint).""", json_schema_extra = { "linkml_meta": {'alias': 'citation_merged_into', 'domain_of': ['CitationRecord']} })
-    citation_comment: Optional[str] = Field(default=None, description="""Curator notes about this citation.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_comment', 'domain_of': ['CitationRecord']} })
-    curated_by: Optional[str] = Field(default=None, description="""Who made the curation decision.""", json_schema_extra = { "linkml_meta": {'alias': 'curated_by', 'domain_of': ['CitationRecord']} })
-    curated_date: Optional[date] = Field(default=None, description="""When the curation decision was made (ISO 8601).""", json_schema_extra = { "linkml_meta": {'alias': 'curated_date', 'domain_of': ['CitationRecord']} })
-    oa_status: Optional[str] = Field(default=None, description="""Open access status from Unpaywall: gold, green, bronze, hybrid, or closed.""", json_schema_extra = { "linkml_meta": {'alias': 'oa_status', 'domain_of': ['CitationRecord']} })
-    pdf_url: Optional[str] = Field(default=None, description="""Best open access PDF URL from Unpaywall.""", json_schema_extra = { "linkml_meta": {'alias': 'pdf_url', 'domain_of': ['CitationRecord']} })
-    pdf_path: Optional[str] = Field(default=None, description="""Relative path to locally stored PDF file.""", json_schema_extra = { "linkml_meta": {'alias': 'pdf_path', 'domain_of': ['CitationRecord']} })
-
-    @field_validator('citation_doi')
-    def pattern_citation_doi(cls, v):
-        pattern=re.compile(r"^10\..+/.+$")
-        if isinstance(v, list):
-            for element in v:
-                if isinstance(element, str) and not pattern.match(element):
-                    err_msg = f"Invalid citation_doi format: {element}"
-                    raise ValueError(err_msg)
-        elif isinstance(v, str) and not pattern.match(v):
-            err_msg = f"Invalid citation_doi format: {v}"
-            raise ValueError(err_msg)
-        return v
-
-    @field_validator('citation_merged_into')
-    def pattern_citation_merged_into(cls, v):
-        pattern=re.compile(r"^10\..+/.+$")
-        if isinstance(v, list):
-            for element in v:
-                if isinstance(element, str) and not pattern.match(element):
-                    err_msg = f"Invalid citation_merged_into format: {element}"
-                    raise ValueError(err_msg)
-        elif isinstance(v, str) and not pattern.match(v):
-            err_msg = f"Invalid citation_merged_into format: {v}"
-            raise ValueError(err_msg)
-        return v
-
-
-class SourceConfig(ConfiguredBaseModel):
-    """
-    Configuration for the item source (e.g., DANDI, Zenodo).
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    type: Optional[str] = Field(default=None, description="""Source type: \"dandi\", \"bibtex\", \"zenodo_org\", \"zenodo_collection\", \"github_org\", \"yaml\", etc.""", json_schema_extra = { "linkml_meta": {'alias': 'type', 'domain_of': ['SourceConfig']} })
-    update_items: Optional[str] = Field(default=None, description="""How to handle items during import: \"add\" (only add new items) or \"sync\" (add new and update existing).""", json_schema_extra = { "linkml_meta": {'alias': 'update_items', 'domain_of': ['SourceConfig']} })
-    include_draft: Optional[bool] = Field(default=False, description="""Include draft/unpublished items.""", json_schema_extra = { "linkml_meta": {'alias': 'include_draft', 'domain_of': ['SourceConfig'], 'ifabsent': 'false'} })
-    group_id: Optional[int] = Field(default=None, description="""Numeric group/org ID (if applicable).""", json_schema_extra = { "linkml_meta": {'alias': 'group_id', 'domain_of': ['SourceConfig', 'ZoteroConfig']} })
-    collection_key: Optional[str] = Field(default=None, description="""Collection key within the source (if applicable).""", json_schema_extra = { "linkml_meta": {'alias': 'collection_key', 'domain_of': ['SourceConfig', 'ZoteroConfig']} })
-    dandiset_ids: Optional[list[str]] = Field(default=None, description="""List of specific DANDI dandiset identifiers to import (e.g., [\"000003\", \"000402\"]). If not specified, imports all dandisets.""", json_schema_extra = { "linkml_meta": {'alias': 'dandiset_ids', 'domain_of': ['SourceConfig']} })
-    bibtex_file: Optional[str] = Field(default=None, description="""Path to BibTeX file (relative to collection YAML or absolute).""", json_schema_extra = { "linkml_meta": {'alias': 'bibtex_file', 'domain_of': ['SourceConfig']} })
-    bib_field: Optional[str] = Field(default=None, description="""BibTeX field to extract reference from (e.g., 'doi', 'url').""", json_schema_extra = { "linkml_meta": {'alias': 'bib_field', 'domain_of': ['SourceConfig']} })
-    ref_type: Optional[RefType] = Field(default=None, description="""Type of reference extracted from bib_field.""", json_schema_extra = { "linkml_meta": {'alias': 'ref_type', 'domain_of': ['ItemRef', 'SourceConfig']} })
-    ref_regex: Optional[str] = Field(default=None, description="""Regex pattern with named groups (?P<item_id>...) and optionally (?P<flavor_id>...) to parse reference into components. If flavor_id not captured, uses 'main'.""", json_schema_extra = { "linkml_meta": {'alias': 'ref_regex', 'domain_of': ['SourceConfig']} })
-
-
-class DiscoverConfig(ConfiguredBaseModel):
-    """
-    Configuration for citation discovery.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    sources: Optional[list[str]] = Field(default=None, description="""List of discovery source names to query (e.g., crossref, opencitations, datacite).""", json_schema_extra = { "linkml_meta": {'alias': 'sources', 'domain_of': ['DiscoverConfig']} })
-    email: Optional[str] = Field(default=None, description="""Contact email for API polite pools.""", json_schema_extra = { "linkml_meta": {'alias': 'email', 'domain_of': ['DiscoverConfig']} })
-
-
-class PdfsConfig(ConfiguredBaseModel):
-    """
-    Configuration for PDF retrieval.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    output_dir: Optional[str] = Field(default="pdfs/", description="""Directory to store downloaded PDFs.""", json_schema_extra = { "linkml_meta": {'alias': 'output_dir',
-         'domain_of': ['PdfsConfig'],
-         'ifabsent': 'string(pdfs/)'} })
-    unpaywall_email: Optional[str] = Field(default="site-unpaywall@oneukrainian.com", description="""Email for Unpaywall API.""", json_schema_extra = { "linkml_meta": {'alias': 'unpaywall_email',
-         'domain_of': ['PdfsConfig'],
-         'ifabsent': 'string(site-unpaywall@oneukrainian.com)'} })
-    git_annex: Optional[bool] = Field(default=False, description="""Store PDFs in git-annex instead of git.""", json_schema_extra = { "linkml_meta": {'alias': 'git_annex', 'domain_of': ['PdfsConfig'], 'ifabsent': 'false'} })
-
-
-class ZoteroConfig(ConfiguredBaseModel):
-    """
-    Configuration for Zotero integration.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    group_id: Optional[int] = Field(default=None, description="""Zotero group library ID.""", json_schema_extra = { "linkml_meta": {'alias': 'group_id', 'domain_of': ['SourceConfig', 'ZoteroConfig']} })
-    collection_key: Optional[str] = Field(default=None, description="""Zotero collection key to sync into.""", json_schema_extra = { "linkml_meta": {'alias': 'collection_key', 'domain_of': ['SourceConfig', 'ZoteroConfig']} })
-
-
-class Collection(ConfiguredBaseModel):
-    """
-    A collection of tracked items. This is the root object that gets serialized to collection.yaml.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector', 'tree_root': True})
-
-    name: str = Field(default=..., description="""Name of the collection (e.g., \"DANDI\", \"ReproNim Tools\").""", json_schema_extra = { "linkml_meta": {'alias': 'name', 'domain_of': ['ItemFlavor', 'Item', 'Collection']} })
-    description: Optional[str] = Field(default=None, description="""Description of the collection.""", json_schema_extra = { "linkml_meta": {'alias': 'description', 'domain_of': ['Item', 'Collection']} })
-    homepage: Optional[str] = Field(default=None, description="""URL to the collection homepage.""", json_schema_extra = { "linkml_meta": {'alias': 'homepage', 'domain_of': ['Item', 'Collection']} })
-    maintainers: Optional[list[str]] = Field(default=None, description="""List of maintainer names or emails.""", json_schema_extra = { "linkml_meta": {'alias': 'maintainers', 'domain_of': ['Collection']} })
-    source_type: Optional[str] = Field(default=None, description="""DEPRECATED: Use source.type instead. Hint for auto-import: \"dandi\", \"zenodo_org\", \"zenodo_collection\", \"github_org\", \"yaml\", etc.""", json_schema_extra = { "linkml_meta": {'alias': 'source_type', 'domain_of': ['Collection']} })
-    source_config: Optional[str] = Field(default=None, description="""DEPRECATED: Use source block instead. Configuration for auto-import (JSON string or nested object).""", json_schema_extra = { "linkml_meta": {'alias': 'source_config', 'domain_of': ['Collection']} })
-    output_tsv: Optional[str] = Field(default=None, description="""Path to the output TSV file for citations.""", json_schema_extra = { "linkml_meta": {'alias': 'output_tsv', 'domain_of': ['Collection']} })
-    source: Optional[SourceConfig] = Field(default=None, description="""Source configuration block.""", json_schema_extra = { "linkml_meta": {'alias': 'source', 'domain_of': ['Collection']} })
-    discover: Optional[DiscoverConfig] = Field(default=None, description="""Citation discovery configuration block.""", json_schema_extra = { "linkml_meta": {'alias': 'discover', 'domain_of': ['Collection']} })
-    pdfs: Optional[PdfsConfig] = Field(default=None, description="""PDF retrieval configuration block.""", json_schema_extra = { "linkml_meta": {'alias': 'pdfs', 'domain_of': ['Collection']} })
-    zotero: Optional[ZoteroConfig] = Field(default=None, description="""Zotero integration configuration block.""", json_schema_extra = { "linkml_meta": {'alias': 'zotero', 'domain_of': ['Collection']} })
-    zotero_group_id: Optional[int] = Field(default=None, description="""DEPRECATED: Use zotero.group_id instead. Zotero group ID for syncing.""", json_schema_extra = { "linkml_meta": {'alias': 'zotero_group_id', 'domain_of': ['Collection']} })
-    zotero_collection_key: Optional[str] = Field(default=None, description="""DEPRECATED: Use zotero.collection_key instead. Zotero parent collection key.""", json_schema_extra = { "linkml_meta": {'alias': 'zotero_collection_key', 'domain_of': ['Collection']} })
-    items: Optional[list[Item]] = Field(default=None, description="""Items in this collection.""", json_schema_extra = { "linkml_meta": {'alias': 'items', 'domain_of': ['Collection']} })
-
-
-class CurationRule(ConfiguredBaseModel):
-    """
-    A rule for automatic curation.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    rule_id: str = Field(default=..., description="""Unique identifier for this rule.""", json_schema_extra = { "linkml_meta": {'alias': 'rule_id', 'domain_of': ['CurationRule']} })
-    rule_type: str = Field(default=..., description="""Type of rule: \"ignore_doi_prefix\", \"ignore_doi\", \"merge_preprint\", \"auto_merge_preprint\", \"flag_for_review\".""", json_schema_extra = { "linkml_meta": {'alias': 'rule_type', 'domain_of': ['CurationRule']} })
-    pattern: str = Field(default=..., description="""Pattern to match (DOI prefix, regex, etc.).""", json_schema_extra = { "linkml_meta": {'alias': 'pattern', 'domain_of': ['CurationRule']} })
-    action: str = Field(default=..., description="""Action to take (ignore, merge, flag).""", json_schema_extra = { "linkml_meta": {'alias': 'action', 'domain_of': ['CurationRule']} })
-    target: Optional[str] = Field(default=None, description="""Target for merge actions.""", json_schema_extra = { "linkml_meta": {'alias': 'target', 'domain_of': ['CurationRule']} })
-    comment: Optional[str] = Field(default=None, description="""Explanation of why this rule exists.""", json_schema_extra = { "linkml_meta": {'alias': 'comment', 'domain_of': ['CurationRule']} })
-    created_by: Optional[str] = Field(default=None, description="""Who created this rule.""", json_schema_extra = { "linkml_meta": {'alias': 'created_by', 'domain_of': ['CurationRule']} })
-    created_date: Optional[date] = Field(default=None, description="""When this rule was created.""", json_schema_extra = { "linkml_meta": {'alias': 'created_date', 'domain_of': ['CurationRule']} })
-
-
-class CurationConfig(ConfiguredBaseModel):
-    """
-    Configuration for automatic curation.
-    """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/dandi/citations-collector'})
-
-    rules: Optional[list[CurationRule]] = Field(default=None, description="""Curation rules to apply automatically.""", json_schema_extra = { "linkml_meta": {'alias': 'rules', 'domain_of': ['CurationConfig']} })
-    preprint_doi_prefixes: Optional[list[str]] = Field(default=None, description="""DOI prefixes that indicate preprints. Default: 10.1101 (bioRxiv), 10.21203 (Research Square), 10.2139 (SSRN).""", json_schema_extra = { "linkml_meta": {'alias': 'preprint_doi_prefixes', 'domain_of': ['CurationConfig']} })
-    ignored_doi_prefixes: Optional[list[str]] = Field(default=None, description="""DOI prefixes to always ignore.""", json_schema_extra = { "linkml_meta": {'alias': 'ignored_doi_prefixes', 'domain_of': ['CurationConfig']} })
-    auto_merge_preprints: Optional[bool] = Field(default=None, description="""If true, automatically merge preprints when published version is found citing the same item.""", json_schema_extra = { "linkml_meta": {'alias': 'auto_merge_preprints', 'domain_of': ['CurationConfig']} })
-
-
-# Model rebuild
-# see https://pydantic-docs.helpmanual.io/usage/models/#rebuilding-a-model
-ItemRef.model_rebuild()
-ItemFlavor.model_rebuild()
-Item.model_rebuild()
-CitationRecord.model_rebuild()
-SourceConfig.model_rebuild()
-DiscoverConfig.model_rebuild()
-PdfsConfig.model_rebuild()
-ZoteroConfig.model_rebuild()
-Collection.model_rebuild()
-CurationRule.model_rebuild()
-CurationConfig.model_rebuild()
+    ref_type: RefType = Field(default=..., description="""Type of identifier.""", json_schema_extra = { "linkml_meta": {'domain_of': ['ItemRef', 'SourceConfig']} })
+    ref_value: str = Field(default=..., description="""The identifier value. Format depends on ref_type: - doi: \"10.1234/example\" (without doi: prefix) - rrid: \"SCR_016216\" (without RRID: prefix) - arxiv: \"2301.12345\" - pmid: \"12345678\" - url: full URL - zenodo: record
