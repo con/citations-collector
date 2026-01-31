@@ -7,6 +7,8 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
+from tqdm import tqdm
+
 from citations_collector.discovery import (
     CrossRefDiscoverer,
     DataCiteDiscoverer,
@@ -334,33 +336,61 @@ class CitationCollector:
         if not self.collection.items:
             return
 
-        for item in self.collection.items:
-            for flavor in item.flavors:
-                for ref in flavor.refs:
-                    logger.info(f"Discovering citations for {item.item_id}/{flavor.flavor_id}")
+        # Count total refs for progress bar
+        total_refs = sum(
+            len(flavor.refs) for item in self.collection.items for flavor in item.flavors
+        )
 
-                    for source_name, discoverer in discoverers:
-                        try:
-                            citations = discoverer.discover(ref, since=since)
+        # Create progress bar
+        with tqdm(
+            total=total_refs * len(discoverers),
+            desc="Discovering citations",
+            unit="query",
+            disable=logger.level < logging.INFO,  # Disable if verbose logging
+        ) as pbar:
+            for item in self.collection.items:
+                for flavor in item.flavors:
+                    for ref in flavor.refs:
+                        for source_name, discoverer in discoverers:
+                            try:
+                                citations = discoverer.discover(ref, since=since)
 
-                            # Fill in item context
-                            for citation in citations:
-                                citation.item_id = item.item_id
-                                citation.item_flavor = flavor.flavor_id
-                                citation.item_ref_type = ref.ref_type
-                                citation.item_ref_value = ref.ref_value
-                                citation.item_name = item.name
+                                # Fill in item context
+                                for citation in citations:
+                                    citation.item_id = item.item_id
+                                    citation.item_flavor = flavor.flavor_id
+                                    citation.item_ref_type = ref.ref_type
+                                    citation.item_ref_value = ref.ref_value
+                                    citation.item_name = item.name
 
-                            all_citations.extend(citations)
-                            logger.info(
-                                f"Found {len(citations)} citations from {source_name} "
-                                f"for {item.item_id}/{flavor.flavor_id}"
-                            )
-                        except Exception as e:
-                            logger.error(
-                                f"Error discovering from {source_name} "
-                                f"for {item.item_id}/{flavor.flavor_id}: {e}"
-                            )
+                                all_citations.extend(citations)
+
+                                # Log only if citations found (reduce noise)
+                                if len(citations) > 0:
+                                    # Pause progress bar for clean logging
+                                    pbar.clear()
+                                    logger.info(
+                                        f"Found {len(citations)} citations from {source_name} "
+                                        f"for {item.item_id}/{flavor.flavor_id}"
+                                    )
+                                    pbar.refresh()
+                                else:
+                                    logger.debug(
+                                        f"Found 0 citations from {source_name} "
+                                        f"for {item.item_id}/{flavor.flavor_id}"
+                                    )
+
+                            except Exception as e:
+                                # Pause progress bar for error logging
+                                pbar.clear()
+                                logger.error(
+                                    f"Error discovering from {source_name} "
+                                    f"for {item.item_id}/{flavor.flavor_id}: {e}"
+                                )
+                                pbar.refresh()
+
+                            # Update progress
+                            pbar.update(1)
 
         # Deduplicate and merge with existing
         unique_citations = deduplicate_citations(all_citations)

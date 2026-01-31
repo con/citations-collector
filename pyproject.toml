@@ -31,6 +31,8 @@ dependencies = [
     "pyyaml>=6.0",
     "pyzotero>=1.5",
     "rapidfuzz>=3.0",
+    "tqdm>=4.0",
+    "urllib3>=1.26",
 ]
 
 [project.optional-dependencies]

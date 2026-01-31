@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import Any, cast
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from citations_collector.discovery.base import AbstractDiscoverer
 from citations_collector.models import CitationRecord, CitationSource, ItemRef
@@ -44,6 +46,17 @@ class CrossRefDiscoverer(AbstractDiscoverer):
         self.session = requests.Session()
         if email:
             self.session.headers["User-Agent"] = f"citations-collector (mailto:{email})"
+
+        # Add retry logic for timeouts and server errors
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=2,  # 2s, 4s, 8s
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "HEAD"],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """

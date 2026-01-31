@@ -7,6 +7,8 @@ import subprocess
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from citations_collector.models import CitationRecord
 from citations_collector.unpaywall import UnpaywallClient
@@ -24,6 +26,26 @@ class PDFAcquirer:
         self.output_dir = Path(output_dir)
         self.unpaywall = UnpaywallClient(email=email)
         self.git_annex = git_annex
+
+        # Create session with retry logic and proper User-Agent
+        self.session = requests.Session()
+        self.session.headers.update(
+            {
+                "User-Agent": f"citations-collector/0.2 (mailto:{email})",
+                "Accept": "application/pdf,*/*",
+            }
+        )
+
+        # Retry on 403, 429, 500, 502, 503, 504 with exponential backoff
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,  # 1s, 2s, 4s
+            status_forcelist=[403, 429, 500, 502, 503, 504],
+            allowed_methods=["GET", "HEAD"],
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
 
     def acquire_for_citation(self, citation: CitationRecord, dry_run: bool = False) -> bool:
         """Look up OA status, download PDF if available. Returns True if PDF was acquired."""
@@ -107,10 +129,10 @@ class PDFAcquirer:
         return Path(doi) / "article.pdf"
 
     def _download(self, url: str, dest: Path) -> bool:
-        """Download URL to dest. Returns True on success."""
+        """Download URL to dest with retry logic. Returns True on success."""
         dest.parent.mkdir(parents=True, exist_ok=True)
         try:
-            resp = requests.get(url, timeout=60, stream=True)
+            resp = self.session.get(url, timeout=60, stream=True)
             resp.raise_for_status()
             with open(dest, "wb") as f:
                 for chunk in resp.iter_content(chunk_size=8192):
