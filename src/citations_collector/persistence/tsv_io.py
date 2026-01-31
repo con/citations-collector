@@ -78,6 +78,12 @@ def load_citations(path: Path) -> list[CitationRecord]:
                 # Single source - still create list for consistency
                 cleaned["citation_sources"] = [sources_field]
                 cleaned["citation_source"] = sources_field
+            else:
+                # No source field - set default for backward compatibility
+                # This can happen with old TSV files or test data
+                # Use "manual" as it's the appropriate enum value for unspecified sources
+                cleaned["citation_source"] = "manual"
+                cleaned["citation_sources"] = ["manual"]
 
             # Create CitationRecord, only including fields that are in the model
             citation = CitationRecord(**cleaned)  # type: ignore[arg-type]

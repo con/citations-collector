@@ -48,6 +48,7 @@ devel = [
     "mypy>=1.0",
     "types-requests",
     "types-pyyaml",
+    "types-tqdm",
     "tox>=4.0",
     "tox-uv>=1.0",
     "pre-commit>=3.0",

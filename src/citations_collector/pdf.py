@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 import subprocess
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
+from requests.models import PreparedRequest, Response
 from urllib3.util.retry import Retry
 
 from citations_collector.models import CitationRecord
@@ -20,9 +22,24 @@ logger = logging.getLogger(__name__)
 class RetryAfterAdapter(HTTPAdapter):
     """HTTPAdapter that respects Retry-After header from server."""
 
-    def send(self, request, **kwargs):
+    def send(
+        self,
+        request: PreparedRequest,
+        stream: bool = False,
+        timeout: float | tuple[float, float] | tuple[float, None] | None = None,
+        verify: bool | str = True,
+        cert: bytes | str | tuple[bytes | str, bytes | str] | None = None,
+        proxies: Mapping[str, str] | None = None,
+    ) -> Response:
         """Send request with Retry-After header support."""
-        response = super().send(request, **kwargs)
+        response = super().send(
+            request,
+            stream=stream,
+            timeout=timeout,
+            verify=verify,
+            cert=cert,
+            proxies=proxies,
+        )
 
         # Check for Retry-After header on 429/503 responses
         if response.status_code in (429, 503):

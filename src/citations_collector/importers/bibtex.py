@@ -66,7 +66,7 @@ class BibTeXImporter:
             raise FileNotFoundError(f"BibTeX file not found: {self.bibtex_file}")
 
         # Parse BibTeX file
-        library = bibtexparser.parse_file(self.bibtex_file)
+        library = bibtexparser.parse_file(str(self.bibtex_file))
 
         # Group flavors by item_id
         items_dict: dict[str, dict[str, Any]] = {}

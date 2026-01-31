@@ -22,7 +22,8 @@ from pydantic import (
     ConfigDict,
     Field,
     RootModel,
-    field_validator
+    field_validator,
+    model_validator
 )
 
 
@@ -326,7 +327,7 @@ class CitationRecord(ConfiguredBaseModel):
     discovered_date: Optional[date] = Field(default=None, description="""DEPRECATED: Use discovered_dates instead. When this citation was first discovered (ISO 8601).""", json_schema_extra = { "linkml_meta": {'alias': 'discovered_date', 'domain_of': ['CitationRecord']} })
     citation_sources: Optional[list[str]] = Field(default=None, description="""All discovery sources that found this citation. Must be coherent with discovered_dates keys. Example: [\"crossref\", \"openalex\", \"datacite\"]""", json_schema_extra = { "linkml_meta": {'alias': 'citation_sources', 'domain_of': ['CitationRecord']} })
     discovered_dates: Optional[str] = Field(default=None, description="""Map of source name to discovery date (ISO 8601). Must be coherent with citation_sources list. Stored as JSON string in TSV. Example: {\"crossref\": \"2025-01-15\", \"openalex\": \"2025-01-20\"}""", json_schema_extra = { "linkml_meta": {'alias': 'discovered_dates', 'domain_of': ['CitationRecord']} })
-    citation_status: CitationStatus = Field(default='active', description="""Curation status.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_status',
+    citation_status: CitationStatus = Field(default=CitationStatus.active, description="""Curation status.""", json_schema_extra = { "linkml_meta": {'alias': 'citation_status',
          'domain_of': ['CitationRecord'],
          'ifabsent': 'string(active)'} })
     citation_merged_into: Optional[str] = Field(default=None, description="""If status is 'merged', the DOI of the canonical version (e.g., published paper DOI when this is a preprint).""", json_schema_extra = { "linkml_meta": {'alias': 'citation_merged_into', 'domain_of': ['CitationRecord']} })
@@ -362,6 +363,48 @@ class CitationRecord(ConfiguredBaseModel):
             err_msg = f"Invalid citation_merged_into format: {v}"
             raise ValueError(err_msg)
         return v
+
+    @model_validator(mode='after')
+    def validate_citation_sources_dates_coherence(self):
+        """
+        Validate that citation_sources and discovered_dates are coherent.
+
+        CUSTOM VALIDATOR: This is not auto-generated from LinkML schema.
+        If regenerating models, this validator must be preserved.
+        """
+        import json
+
+        # If both are None/empty, that's fine
+        if not self.citation_sources and not self.discovered_dates:
+            return self
+
+        # If only one is set, that's fine (discovered_dates is optional)
+        if not self.discovered_dates:
+            return self
+
+        if not self.citation_sources:
+            return self
+
+        # Parse discovered_dates JSON
+        try:
+            dates_dict = json.loads(self.discovered_dates)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON in discovered_dates")
+
+        if not isinstance(dates_dict, dict):
+            raise ValueError("discovered_dates must be a JSON object (dict), not array or other type")
+
+        # Check coherence: keys in dates_dict must match citation_sources
+        sources_set = set(self.citation_sources)
+        dates_set = set(dates_dict.keys())
+
+        if sources_set != dates_set:
+            raise ValueError(
+                f"citation_sources and discovered_dates must be coherent: "
+                f"sources={sorted(sources_set)}, dates_keys={sorted(dates_set)}"
+            )
+
+        return self
 
 
 class SourceConfig(ConfiguredBaseModel):

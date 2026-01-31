@@ -26,15 +26,15 @@ def test_retry_after_adapter_respects_header():
     response.status_code = 429
     response.headers = {"Retry-After": "2"}  # 2 seconds
 
-    # Patch super().send to return our mock response
-    with patch.object(HTTPAdapter, "send", return_value=response):
-        start_time = time.time()
+    # Patch both super().send and time.sleep to avoid actual waiting
+    with (
+        patch.object(HTTPAdapter, "send", return_value=response),
+        patch("time.sleep") as mock_sleep,
+    ):
         result = adapter.send(request)
-        elapsed = time.time() - start_time
 
-        # Should have waited ~2 seconds
-        assert elapsed >= 2.0
-        assert elapsed < 3.0  # Allow some margin
+        # Should have called sleep with 2 seconds
+        mock_sleep.assert_called_once_with(2)
         assert result == response
 
 
@@ -50,12 +50,14 @@ def test_retry_after_adapter_503_response():
     response.status_code = 503
     response.headers = {"Retry-After": "1"}  # 1 second
 
-    with patch.object(HTTPAdapter, "send", return_value=response):
-        start_time = time.time()
+    with (
+        patch.object(HTTPAdapter, "send", return_value=response),
+        patch("time.sleep") as mock_sleep,
+    ):
         adapter.send(request)
-        elapsed = time.time() - start_time
 
-        assert elapsed >= 1.0
+        # Should have called sleep with 1 second
+        mock_sleep.assert_called_once_with(1)
 
 
 @pytest.mark.ai_generated
@@ -113,13 +115,14 @@ def test_retry_after_adapter_invalid_header():
     response.status_code = 429
     response.headers = {"Retry-After": "Wed, 21 Oct 2025 07:28:00 GMT"}  # HTTP date format
 
-    with patch.object(HTTPAdapter, "send", return_value=response):
-        # Should fall back to 60 seconds for HTTP date format
-        # For testing, we just verify it doesn't crash
-        # (in real usage this would wait 60s, but we don't want tests to be that slow)
+    with (
+        patch.object(HTTPAdapter, "send", return_value=response),
+        patch("time.sleep") as mock_sleep,
+    ):
+        # Should fall back to 60 seconds for HTTP date format (non-integer Retry-After)
         adapter.send(request)
-        # Just verify no exception raised
-        assert True
+        # Should have called sleep with 60 seconds (fallback for HTTP date format)
+        mock_sleep.assert_called_once_with(60)
 
 
 @pytest.mark.ai_generated
@@ -128,10 +131,10 @@ def test_download_rate_limiting(tmp_path: Path):
     import responses
 
     acquirer = PDFAcquirer(output_dir=tmp_path)
-    acquirer._download_delay = 0.5  # 0.5 second for faster testing
+    acquirer._download_delay = 0.5  # 0.5 second delay
 
     # Mock HTTP responses
-    with responses.RequestsMock() as rsps:
+    with responses.RequestsMock() as rsps, patch("time.sleep") as mock_sleep:
         # Add two successful PDF responses
         rsps.add(
             responses.GET,
@@ -149,19 +152,19 @@ def test_download_rate_limiting(tmp_path: Path):
         )
 
         # First download
-        start_time = time.time()
         dest1 = tmp_path / "file1.pdf"
         result1 = acquirer._download("https://example.com/1.pdf", dest1)
         assert result1 == dest1
 
-        # Second download - should be delayed
+        # Second download - should trigger rate limiting sleep
         dest2 = tmp_path / "file2.pdf"
         result2 = acquirer._download("https://example.com/2.pdf", dest2)
-        elapsed = time.time() - start_time
-
-        # Should have waited at least 0.5 second between downloads
-        assert elapsed >= 0.5
         assert result2 == dest2
+
+        # Should have called sleep once with ~0.5 seconds for rate limiting
+        assert mock_sleep.call_count == 1
+        sleep_duration = mock_sleep.call_args[0][0]
+        assert 0.4 <= sleep_duration <= 0.5  # Allow small margin for timing
 
 
 @pytest.mark.ai_generated
