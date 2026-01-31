@@ -61,6 +61,7 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             return []
 
         doi = item_ref.ref_value
+        logger.debug(f"CrossRef querying for DOI: {doi}")
 
         # Query CrossRef Event Data for citations
         # obj-id is the DOI being cited, subj-id is the citing work
