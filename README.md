@@ -255,6 +255,8 @@ See the `examples/` directory for production configurations:
 ### DANDI Archive (`dandi-collection.yaml`)
 Tracks all 850+ DANDI dandisets via external BibTeX file maintained by `dandi-citations` tool. Items are extracted from versioned DOIs like `10.48324/dandi.000003/0.210812.1448` using regex parsing. Perfect example of external item management - the YAML stays clean while the BibTeX file is the source of truth.
 
+**Complete pipeline**: See [dandi/dandi-bib](https://github.com/dandi/dandi-bib) for the full production setup including automation, BibTeX generation, and citation tracking workflows.
+
 **Key features**: BibTeX source, regex extraction, external maintenance
 
 ### MICrONS Dataset (`microns-collection.yaml`)
