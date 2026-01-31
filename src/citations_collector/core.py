@@ -287,6 +287,54 @@ class CitationCollector:
         most_recent = max(dates)
         return datetime.combine(most_recent, datetime.min.time())
 
+    def _report_discoveries(self, new_citations: list[CitationRecord]) -> None:
+        """
+        Report discovered citations grouped by DOI, showing which sources found each.
+
+        Only reports citations that are NEW (not already in self.citations).
+
+        Args:
+            new_citations: Newly discovered citations to report
+        """
+        if not new_citations:
+            return
+
+        # Build set of existing citation keys to identify truly new ones
+        existing_keys = {(c.item_id, c.item_flavor, c.citation_doi) for c in self.citations}
+
+        # Group new citations by DOI
+        doi_groups: dict[str, list[CitationRecord]] = {}
+        for citation in new_citations:
+            key = (citation.item_id, citation.item_flavor, citation.citation_doi)
+            # Only report if not already in existing citations
+            if key not in existing_keys:
+                doi = citation.citation_doi or "unknown"
+                if doi not in doi_groups:
+                    doi_groups[doi] = []
+                doi_groups[doi].append(citation)
+
+        # Report each new DOI with sources
+        if doi_groups:
+            logger.info(f"\nDiscovered {len(doi_groups)} new citations:")
+            for doi, group in sorted(doi_groups.items()):
+                # Collect all sources that found this DOI
+                sources = set()
+                for citation in group:
+                    if hasattr(citation, "citation_sources") and citation.citation_sources:
+                        sources.update(citation.citation_sources)
+                    elif citation.citation_source:
+                        sources.add(citation.citation_source)
+
+                # Format sources
+                sources_str = ", ".join(sorted(sources)) if sources else "unknown"
+
+                # Show item_id/flavor and title (truncated)
+                item_ref = f"{group[0].item_id}/{group[0].item_flavor}"
+                title = (group[0].citation_title or "")[:60]
+                title_suffix = "..." if len(group[0].citation_title or "") > 60 else ""
+                logger.info(f"  {doi} [{sources_str}]")
+                logger.info(f"    → {item_ref}: {title}{title_suffix}")
+
     def discover_all(
         self,
         sources: list[str] | None = None,
@@ -358,30 +406,21 @@ class CitationCollector:
                             try:
                                 citations = discoverer.discover(ref, since=since)
 
-                                # Fill in item context
+                                # Fill in item context and track source
                                 for citation in citations:
                                     citation.item_id = item.item_id
                                     citation.item_flavor = flavor.flavor_id
                                     citation.item_ref_type = ref.ref_type
                                     citation.item_ref_value = ref.ref_value
                                     citation.item_name = item.name
+                                    # Track which source found this citation
+                                    citation.citation_source = source_name  # type: ignore[assignment]
 
                                 all_citations.extend(citations)
-
-                                # Log only if citations found (reduce noise)
-                                if len(citations) > 0:
-                                    # Pause progress bar for clean logging
-                                    pbar.clear()
-                                    logger.info(
-                                        f"Found {len(citations)} citations from {source_name} "
-                                        f"for {item.item_id}/{flavor.flavor_id}"
-                                    )
-                                    pbar.refresh()
-                                else:
-                                    logger.debug(
-                                        f"Found 0 citations from {source_name} "
-                                        f"for {item.item_id}/{flavor.flavor_id}"
-                                    )
+                                logger.debug(
+                                    f"{source_name}: {len(citations)} citations "
+                                    f"for {item.item_id}/{flavor.flavor_id}"
+                                )
 
                             except Exception as e:
                                 # Pause progress bar for error logging
@@ -397,6 +436,10 @@ class CitationCollector:
 
         # Deduplicate and merge with existing
         unique_citations = deduplicate_citations(all_citations)
+
+        # Report new citations grouped by DOI with sources
+        self._report_discoveries(unique_citations)
+
         self.merge_citations(unique_citations)
 
     def load_existing_citations(self, path: Path) -> None:
