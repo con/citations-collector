@@ -393,46 +393,67 @@ class CitationCollector:
 
         # Create progress bar
         # Disable only if DEBUG logging is enabled (so debug messages are visible)
+        # Configure logging to use tqdm.write() while progress bar is active
+        class TqdmLoggingHandler(logging.Handler):
+            def __init__(self, tqdm_instance):
+                super().__init__()
+                self.tqdm_instance = tqdm_instance
+
+            def emit(self, record):
+                try:
+                    msg = self.format(record)
+                    self.tqdm_instance.write(msg)
+                except Exception:
+                    self.handleError(record)
+
         with tqdm(
             total=total_refs * len(discoverers),
             desc="Discovering citations",
             unit="query",
             disable=logger.getEffectiveLevel() <= logging.DEBUG,
         ) as pbar:
-            for item in self.collection.items:
-                for flavor in item.flavors:
-                    for ref in flavor.refs:
-                        for source_name, discoverer in discoverers:
-                            try:
-                                citations = discoverer.discover(ref, since=since)
+            # Install tqdm logging handler for the duration of discovery
+            tqdm_handler = TqdmLoggingHandler(pbar)
+            tqdm_handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+            root_logger = logging.getLogger()
+            original_handlers = root_logger.handlers[:]
+            root_logger.handlers = [tqdm_handler]
 
-                                # Fill in item context and track source
-                                for citation in citations:
-                                    citation.item_id = item.item_id
-                                    citation.item_flavor = flavor.flavor_id
-                                    citation.item_ref_type = ref.ref_type
-                                    citation.item_ref_value = ref.ref_value
-                                    citation.item_name = item.name
-                                    # Track which source found this citation
-                                    citation.citation_source = source_name  # type: ignore[assignment]
+            try:
+                for item in self.collection.items:
+                    for flavor in item.flavors:
+                        for ref in flavor.refs:
+                            for source_name, discoverer in discoverers:
+                                try:
+                                    citations = discoverer.discover(ref, since=since)
 
-                                all_citations.extend(citations)
-                                logger.debug(
-                                    f"{source_name}: {len(citations)} citations "
-                                    f"for {item.item_id}/{flavor.flavor_id}"
-                                )
+                                    # Fill in item context and track source
+                                    for citation in citations:
+                                        citation.item_id = item.item_id
+                                        citation.item_flavor = flavor.flavor_id
+                                        citation.item_ref_type = ref.ref_type
+                                        citation.item_ref_value = ref.ref_value
+                                        citation.item_name = item.name
+                                        # Track which source found this citation
+                                        citation.citation_source = source_name  # type: ignore[assignment]
 
-                            except Exception as e:
-                                # Pause progress bar for error logging
-                                pbar.clear()
-                                logger.error(
-                                    f"Error discovering from {source_name} "
-                                    f"for {item.item_id}/{flavor.flavor_id}: {e}"
-                                )
-                                pbar.refresh()
+                                    all_citations.extend(citations)
+                                    logger.debug(
+                                        f"{source_name}: {len(citations)} citations "
+                                        f"for {item.item_id}/{flavor.flavor_id}"
+                                    )
 
-                            # Update progress
-                            pbar.update(1)
+                                except Exception as e:
+                                    logger.error(
+                                        f"Error discovering from {source_name} "
+                                        f"for {item.item_id}/{flavor.flavor_id}: {e}"
+                                    )
+
+                                # Update progress
+                                pbar.update(1)
+            finally:
+                # Restore original logging handlers
+                root_logger.handlers = original_handlers
 
         # Deduplicate and merge with existing
         unique_citations = deduplicate_citations(all_citations)
