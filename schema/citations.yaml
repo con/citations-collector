@@ -13,6 +13,10 @@ prefixes:
   citations: https://w3id.org/dandi/citations-collector/
   schema: http://schema.org/
   datacite: https://purl.org/datacite/v4.4/
+  cito: http://purl.org/spar/cito/
+  fabio: http://purl.org/spar/fabio/
+  dcterms: http://purl.org/dc/terms/
+  foaf: http://xmlns.com/foaf/0.1/
 
 default_prefix: citations
 default_range: string
@@ -52,42 +56,157 @@ enums:
         description: GitHub repository (owner/repo format).
 
   CitationRelationship:
-    description: The relationship between a citing work and the cited item.
+    description: >-
+      The relationship between a citing work and the cited item.
+      Aligned with CiTO (Citation Typing Ontology) and DataCite relationship types.
     permissible_values:
       Cites:
         description: The work explicitly cites the item in its references.
+        meaning: cito:cites
+        exact_mappings:
+          - datacite:Cites
       IsDocumentedBy:
         description: The item is documented by this work (e.g., a data descriptor).
+        meaning: cito:isDocumentedBy
+        exact_mappings:
+          - datacite:IsDocumentedBy
       Describes:
         description: The work describes the item or its creation methodology.
+        meaning: cito:documents
+        exact_mappings:
+          - datacite:Describes
       IsSupplementedBy:
         description: The item is supplemented by this work.
+        meaning: cito:isSupplementedBy
+        exact_mappings:
+          - datacite:IsSupplementedBy
       References:
         description: The work references the item without formal citation.
+        broad_mappings:
+          - cito:cites
+        exact_mappings:
+          - datacite:References
       Uses:
         description: The work uses data/code from the item.
+        meaning: cito:usesDataFrom
+        exact_mappings:
+          - datacite:Cites
+        comments:
+          - Mapped to cito:usesDataFrom for semantic precision in dataset citations.
       IsDerivedFrom:
         description: The work is derived from the item.
+        exact_mappings:
+          - datacite:IsDerivedFrom
+        broad_mappings:
+          - cito:obtainsSupportFrom
+      CitesAsDataSource:
+        description: >-
+          The work explicitly cites the item as a source of data.
+          More specific than generic Cites for data reuse scenarios.
+        meaning: cito:citesAsDataSource
+        exact_mappings:
+          - datacite:References
+        comments:
+          - >-
+            Use when paper explicitly acknowledges using data from a dataset.
+          - >-
+            Distinguishes explicit data citation from general reference.
+          - >-
+            Common in papers that analyze existing datasets for new insights.
+      Reviews:
+        description: >-
+          The work reviews, evaluates, or critically assesses the cited item.
+        meaning: cito:reviews
+        exact_mappings:
+          - datacite:Reviews
+        comments:
+          - >-
+            Use for systematic reviews, dataset evaluations, quality assessments.
+          - >-
+            Example: "A comprehensive review of publicly available EEG datasets"
+      CitesAsEvidence:
+        description: >-
+          The work uses the cited item as evidence to support claims or validate methods.
+        meaning: cito:citesAsEvidence
+        comments:
+          - >-
+            Use for validation studies, benchmarking, method comparison.
+          - >-
+            Example: "We validated our algorithm against dataset X"
+          - >-
+            Distinguishes validation from active data reuse (Uses/UsesDataFrom).
+      Compiles:
+        description: >-
+          The work compiles or aggregates data from multiple datasets including this one.
+        meaning: cito:compiles
+        comments:
+          - >-
+            CiTO inverse property: cito:isCompiledBy
+          - >-
+            Use for meta-analyses combining multiple datasets.
+          - >-
+            Should be combined with citation_comment listing other datasets.
+          - >-
+            Example: "Meta-analysis combining datasets A, B, and C"
+          - >-
+            Multi-dataset papers create multiple TSV rows with same citation_doi.
+      CitesForInformation:
+        description: >-
+          The work cites the item as background information or context.
+        meaning: cito:citesForInformation
+        comments:
+          - >-
+            Use for contextual/background references, tutorials, educational materials.
+          - >-
+            More specific than generic References.
+          - >-
+            Example: Tutorial mentioning dataset availability.
 
   CitationType:
-    description: The type of citing work.
+    description: >-
+      The type of citing work.
+      Aligned with FaBiO (FRBR-aligned Bibliographic Ontology) and schema.org types.
     permissible_values:
       Publication:
         description: Peer-reviewed journal article or conference paper.
+        meaning: fabio:JournalArticle
+        exact_mappings:
+          - schema:ScholarlyArticle
       Preprint:
         description: Non-peer-reviewed preprint (bioRxiv, arXiv, etc.).
+        meaning: fabio:Preprint
+        related_mappings:
+          - schema:ScholarlyArticle
       Protocol:
         description: Published protocol (protocols.io, etc.).
+        meaning: fabio:ExperimentalProtocol
+        broad_mappings:
+          - schema:HowTo
       Thesis:
         description: Doctoral or master's thesis.
+        meaning: fabio:Thesis
+        exact_mappings:
+          - schema:Thesis
       Book:
         description: Book or book chapter.
+        meaning: fabio:Book
+        exact_mappings:
+          - schema:Book
       Software:
         description: Software package or tool.
+        meaning: fabio:ComputerProgram
+        exact_mappings:
+          - schema:SoftwareSourceCode
       Dataset:
         description: Another dataset that cites this one.
+        meaning: fabio:Dataset
+        exact_mappings:
+          - schema:Dataset
       Other:
         description: Other type of work.
+        broad_mappings:
+          - schema:CreativeWork
+          - fabio:Expression
 
   CitationSource:
     description: The source from which the citation was discovered.
@@ -195,6 +314,9 @@ classes:
       A tracked resource with one or more flavors (versions). The item_id
       can encode hierarchy using ":" separator (e.g., "dandi:000003",
       "repronim:fmriprep", or just "my-tool").
+    class_uri: schema:CreativeWork
+    exact_mappings:
+      - dcterms:Resource
     attributes:
       item_id:
         description: >-
@@ -203,12 +325,24 @@ classes:
           The part before ":" indicates the source/project.
         required: true
         identifier: true
+        exact_mappings:
+          - dcterms:identifier
+          - schema:identifier
       name:
         description: Human-readable name.
+        exact_mappings:
+          - schema:name
+          - dcterms:title
       description:
         description: Description of the item.
+        exact_mappings:
+          - schema:description
+          - dcterms:description
       homepage:
         description: URL to the item's homepage or landing page.
+        exact_mappings:
+          - schema:url
+          - foaf:homepage
       flavors:
         description: Versions/variants of this item.
         range: ItemFlavor
@@ -223,6 +357,13 @@ classes:
     description: >-
       A record representing a citation relationship between a citing work
       and a tracked item. Each row in the citations TSV.
+    class_uri: cito:CitationAct
+    exact_mappings:
+      - datacite:Relation
+    comments:
+      - >-
+        Represents a citation relationship aligned with CiTO (Citation Typing Ontology)
+        and DataCite relationTypes.
     attributes:
       # What is being cited (the tracked item)
       item_id:
@@ -243,30 +384,70 @@ classes:
       citation_doi:
         description: DOI of the citing work (primary identifier).
         pattern: "^10\\..+/.+$"
+        exact_mappings:
+          - datacite:doi
+          - schema:identifier
       citation_pmid:
         description: PubMed ID of the citing work.
+        exact_mappings:
+          - schema:identifier
       citation_arxiv:
         description: arXiv ID of the citing work.
+        exact_mappings:
+          - schema:identifier
       citation_url:
         description: URL to the citing work (fallback if no DOI).
+        exact_mappings:
+          - schema:url
       citation_title:
         description: Title of the citing work.
+        exact_mappings:
+          - dcterms:title
+          - schema:name
       citation_authors:
         description: Authors of the citing work (semicolon-separated).
+        exact_mappings:
+          - dcterms:creator
+          - schema:author
+        comments:
+          - Consider migrating to structured Person list for better semantic alignment.
       citation_year:
         description: Publication year of the citing work.
         range: integer
+        exact_mappings:
+          - dcterms:issued
+          - schema:datePublished
       citation_journal:
         description: Journal or venue of the citing work.
+        exact_mappings:
+          - schema:isPartOf
 
       # Relationship metadata
       citation_relationship:
-        description: How the citing work relates to the item.
+        description: >-
+          DEPRECATED: Use citation_relationships instead.
+          Primary relationship type (kept for backward compatibility).
         range: CitationRelationship
         required: true
+      citation_relationships:
+        description: >-
+          How the citing work relates to the item. Can have multiple relationship types.
+          Example: ["Cites", "Uses"] for a paper that both cites and uses data from a dataset.
+          Must be coherent with citation_relationship (first value).
+        range: CitationRelationship
+        multivalued: true
+        slot_uri: cito:hasCitationCharacterization
+        comments:
+          - >-
+            In CiTO terms, a citation can have multiple characterizations.
+          - >-
+            Common combinations: Cites+Uses, IsDocumentedBy+Extends, References+IsDerivedFrom.
       citation_type:
         description: Type of the citing work.
         range: CitationType
+        exact_mappings:
+          - dcterms:type
+          - schema:additionalType
 
       # Provenance
       citation_source:
@@ -425,14 +606,26 @@ classes:
       A collection of tracked items. This is the root object that gets
       serialized to collection.yaml.
     tree_root: true
+    class_uri: schema:Collection
+    exact_mappings:
+      - dcterms:Collection
     attributes:
       name:
         description: Name of the collection (e.g., "DANDI", "ReproNim Tools").
         required: true
+        exact_mappings:
+          - schema:name
+          - dcterms:title
       description:
         description: Description of the collection.
+        exact_mappings:
+          - schema:description
+          - dcterms:description
       homepage:
         description: URL to the collection homepage.
+        exact_mappings:
+          - schema:url
+          - foaf:homepage
       maintainers:
         description: List of maintainer names or emails.
         multivalued: true

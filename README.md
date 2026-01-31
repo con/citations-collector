@@ -5,6 +5,8 @@ Discover and curate scholarly citations of datasets and software.
 ## Features
 
 - **Multi-Source Citation Discovery**: Query CrossRef, OpenCitations, DataCite, and OpenAlex - automatically merges results from multiple sources
+- **Ontology Alignment**: Schema aligned with [CiTO](https://sparontologies.github.io/cito/), [FaBiO](https://sparontologies.github.io/fabio/), [DataCite](https://schema.datacite.org/), and [schema.org](https://schema.org) for semantic interoperability and RDF export
+- **Multi-Source Tracking**: Track citations discovered by multiple APIs with coherent provenance metadata
 - **External Item Management**: Track items via BibTeX files or dynamically fetch from DANDI Archive API
 - **Hierarchical Collections**: Organize citations by project/version (e.g., DANDI dandisets, dataset releases)
 - **Git-Friendly**: YAML collections + TSV citation records for version control
@@ -12,7 +14,7 @@ Discover and curate scholarly citations of datasets and software.
 - **Intelligent Retry Logic**: Respects rate limits with exponential backoff and Retry-After headers
 - **PDF Acquisition**: Automatically download open-access PDFs via Unpaywall with intelligent HTML/PDF detection
 - **Merge Detection**: Auto-detect preprints with published versions using CrossRef relationships
-- **Zotero Integration**: Sync citations to hierarchical Zotero collections with automatic merged item relocation
+- **Zotero Integration**: Sync citations to hierarchical Zotero collections with automatic merged item relocation and related items links
 - **Incremental Updates**: Efficiently discover only new citations since last run
 
 ## Installation
@@ -362,6 +364,41 @@ All four sources are queried in parallel, and results are automatically deduplic
 **Multi-Source Tracking**: When the same citation is found by multiple sources (e.g., both CrossRef and OpenAlex), it's stored as a single row in the TSV with `citation_sources: "crossref, openalex"`. This helps verify citation coverage and identify which sources are most useful for your domain.
 
 **Future Sources**: Europe PMC (PubMed-indexed papers), Semantic Scholar (AI-powered discovery)
+
+## Semantic Interoperability
+
+The schema is aligned with established scholarly communication ontologies to enable semantic precision and RDF export:
+
+### Ontology Alignment
+
+- **[CiTO](https://sparontologies.github.io/cito/)** - Citation Typing Ontology for relationship types
+  - Maps citation relationships: `cites`, `usesDataFrom`, `isDocumentedBy`, etc.
+  - Enables precise characterization of how works cite datasets/software
+
+- **[FaBiO](https://sparontologies.github.io/fabio/)** - FRBR-aligned Bibliographic Ontology for resource types
+  - Maps work types: `JournalArticle`, `Preprint`, `Dataset`, `ComputerProgram`, etc.
+  - Aligned with scholarly publication taxonomy
+
+- **[DataCite](https://schema.datacite.org/)** - Research data identifiers and relationships
+  - Compatible with DataCite metadata schema and relation types
+  - Supports integration with DataCite graph
+
+- **[schema.org](https://schema.org)** - General web semantics
+  - Maps to `ScholarlyArticle`, `Dataset`, `SoftwareSourceCode`, `Collection`
+  - Enables structured data markup for web discovery
+
+- **[Dublin Core](https://www.dublincore.org/specifications/dublin-core/dcmi-terms/)** - Core metadata vocabulary
+  - Standard properties: `title`, `creator`, `description`, `identifier`
+
+### Benefits
+
+- **FAIR Compliance**: Findable, Accessible, Interoperable, Reusable data
+- **RDF Export**: Citations can be exported as Linked Data for knowledge graphs
+- **Standards-Based**: Compatible with institutional repositories and DataCite/CrossRef graphs
+- **Semantic Queries**: SPARQL queries across citation networks
+- **Backward Compatible**: Mappings are purely additive, no breaking changes to YAML/TSV
+
+See [`.specify/specs/ontology-alignment.md`](.specify/specs/ontology-alignment.md) for detailed mapping documentation.
 
 ## License
 
