@@ -254,48 +254,56 @@ def test_biorxiv_download_integration(tmp_path: Path):
     """
     Integration test: Actually download a PDF from bioRxiv.
 
-    This test makes real network requests and should be skipped in CI.
+    This test verifies that our User-Agent configuration passes Cloudflare's bot detection.
+    Before fix: Would fail with 403 "too many error responses" due to custom User-Agent
+    After fix: Succeeds with default python-requests User-Agent
+
     Run with: pytest -m integration
     """
-    from citations_collector.models import CitationRecord
+    import requests
 
-    # Use a stable, old bioRxiv preprint (less likely to be taken down)
-    # This is the first ever bioRxiv preprint from 2013
-    test_doi = "10.1101/001081"
+    # Use a recent bioRxiv preprint to test real-world scenario
+    direct_pdf_url = (
+        "https://www.biorxiv.org/content/biorxiv/early/2026/01/09/2026.01.08.698522.full.pdf"
+    )
 
     acquirer = PDFAcquirer(output_dir=tmp_path)
 
-    # Create citation
-    citation = CitationRecord(
-        item_id="test",
-        item_flavor="main",
-        citation_doi=test_doi,
-        citation_relationship="Cites",
-        citation_source="crossref",
-        citation_status="active",
-    )
-
-    # Try to acquire PDF
+    # Only skip on legitimate network failures (DNS, timeout, connection refused)
+    # 403 errors should FAIL the test - they indicate our User-Agent is blocked
     try:
-        result = acquirer.acquire_for_citation(citation)
+        # First, verify we can directly download from bioRxiv with our session
+        dest = tmp_path / "direct_test.pdf"
+        downloaded_path = acquirer._download(direct_pdf_url, dest)
 
-        if result:
-            # Check that file was downloaded
-            assert citation.pdf_path is not None
-            pdf_path = Path(citation.pdf_path)
-            assert pdf_path.exists()
-            assert pdf_path.stat().st_size > 1000  # At least 1KB
+        # This should succeed - if it returns None or raises 403, something is wrong
+        assert downloaded_path is not None, (
+            "Direct bioRxiv download failed - likely Cloudflare blocking our User-Agent. "
+            f"User-Agent: {acquirer.session.headers.get('User-Agent', 'default')}"
+        )
+        assert downloaded_path.exists()
+        assert downloaded_path.stat().st_size > 100000  # At least 100KB for a real PDF
 
-            # Check file extension
-            assert pdf_path.suffix in [".pdf", ".html"]
+        print("✓ bioRxiv download successful!")
+        print(f"  User-Agent: {acquirer.session.headers.get('User-Agent', 'default')}")
+        print(f"  File: {downloaded_path}")
+        print(f"  Size: {downloaded_path.stat().st_size} bytes")
 
-            print(f"Successfully downloaded: {pdf_path}")
-            print(f"File size: {pdf_path.stat().st_size} bytes")
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        # Only skip on legitimate network failures
+        pytest.skip(f"Network connectivity issue (expected in some environments): {e}")
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 403:
+            # 403 should FAIL the test, not skip it
+            pytest.fail(
+                f"bioRxiv returned 403 Forbidden - Cloudflare is blocking our User-Agent!\n"
+                f"User-Agent: {acquirer.session.headers.get('User-Agent', 'default')}\n"
+                f"This likely means a custom User-Agent is triggering bot detection.\n"
+                f"Error: {e}"
+            )
         else:
-            # Might not be OA or already exists
-            print(f"Did not download (OA status: {citation.oa_status})")
-    except Exception as e:
-        pytest.skip(f"Network request failed (expected in CI): {e}")
+            # Other HTTP errors also fail
+            pytest.fail(f"HTTP error {e.response.status_code}: {e}")
 
 
 @pytest.mark.integration
@@ -306,14 +314,15 @@ def test_biorxiv_rate_limiting_integration(tmp_path: Path):
     Integration test: Verify rate limiting works with real bioRxiv requests.
 
     Downloads 3 PDFs in sequence and verifies delays are enforced.
+    Also verifies our User-Agent passes Cloudflare (would fail with 403 before fix).
     """
-    from citations_collector.models import CitationRecord
+    import requests
 
-    # Use stable old bioRxiv preprints
-    test_dois = [
-        "10.1101/001081",  # First bioRxiv paper
-        "10.1101/001123",  # Second bioRxiv paper
-        "10.1101/001156",  # Third bioRxiv paper
+    # Use direct bioRxiv PDF URLs
+    test_urls = [
+        "https://www.biorxiv.org/content/biorxiv/early/2026/01/09/2026.01.08.698522.full.pdf",
+        "https://www.biorxiv.org/content/biorxiv/early/2025/10/17/2025.10.17.682993.full.pdf",
+        "https://www.biorxiv.org/content/biorxiv/early/2025/07/04/2025.06.30.662469.full.pdf",
     ]
 
     acquirer = PDFAcquirer(output_dir=tmp_path)
@@ -321,30 +330,44 @@ def test_biorxiv_rate_limiting_integration(tmp_path: Path):
 
     start_time = time.time()
     downloaded = 0
+    failed_403 = []
 
-    for doi in test_dois:
-        citation = CitationRecord(
-            item_id="test",
-            item_flavor="main",
-            citation_doi=doi,
-            citation_relationship="Cites",
-            citation_source="crossref",
-            citation_status="active",
-        )
+    # Only skip on legitimate network failures, not on 403
+    try:
+        for i, url in enumerate(test_urls):
+            dest = tmp_path / f"test_{i}.pdf"
+            try:
+                result = acquirer._download(url, dest)
+                if result and result.exists():
+                    downloaded += 1
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 403:
+                    failed_403.append(url)
+                    # Continue to test other URLs
+                else:
+                    raise
 
-        try:
-            if acquirer.acquire_for_citation(citation):
-                downloaded += 1
-        except Exception as e:
-            pytest.skip(f"Network request failed: {e}")
+        # If we got any 403s, fail the test
+        if failed_403:
+            pytest.fail(
+                f"bioRxiv returned 403 Forbidden for {len(failed_403)} URLs - "
+                f"Cloudflare is blocking our User-Agent!\n"
+                f"User-Agent: {acquirer.session.headers.get('User-Agent', 'default')}\n"
+                f"Failed URLs: {failed_403}"
+            )
 
-    elapsed = time.time() - start_time
+        elapsed = time.time() - start_time
 
-    if downloaded >= 2:
-        # Should have at least 2 seconds delay between downloads
-        expected_min_time = (downloaded - 1) * 2.0
-        assert elapsed >= expected_min_time, (
-            f"Expected at least {expected_min_time}s for {downloaded} downloads, "
-            f"but took only {elapsed}s"
-        )
-        print(f"Downloaded {downloaded} files in {elapsed:.1f}s (rate limiting working)")
+        if downloaded >= 2:
+            # Should have at least 2 seconds delay between downloads
+            expected_min_time = (downloaded - 1) * 2.0
+            assert elapsed >= expected_min_time, (
+                f"Expected at least {expected_min_time}s for {downloaded} downloads, "
+                f"but took only {elapsed}s"
+            )
+            print(f"✓ Downloaded {downloaded} files in {elapsed:.1f}s (rate limiting working)")
+        elif downloaded == 0:
+            pytest.skip("Could not download any files - network issue")
+
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        pytest.skip(f"Network connectivity issue: {e}")
