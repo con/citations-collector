@@ -25,7 +25,7 @@ TSV_COLUMNS = [
     "citation_journal",
     "citation_relationship",
     "citation_type",
-    "citation_source",
+    "citation_sources",  # Plural - can contain comma-separated values
     "discovered_date",
     "citation_status",
     "citation_merged_into",
@@ -65,12 +65,19 @@ def load_citations(path: Path) -> list[CitationRecord]:
                 with suppress(ValueError):
                     cleaned["citation_year"] = int(cleaned["citation_year"])  # type: ignore[arg-type]
 
-            # Parse citation_source: if it contains commas, it's multiple sources
-            if cleaned.get("citation_source") and "," in str(cleaned["citation_source"]):
-                sources = [s.strip() for s in cleaned["citation_source"].split(",")]
+            # Parse citation_sources from TSV (comma-separated)
+            # Support both old "citation_source" and new "citation_sources" columns
+            sources_field = cleaned.get("citation_sources") or cleaned.get("citation_source")
+            if sources_field and "," in str(sources_field):
+                # Multiple sources - parse into list
+                sources = [s.strip() for s in sources_field.split(",")]
                 cleaned["citation_sources"] = sources
-                # Keep citation_source set to first source (required field)
-                cleaned["citation_source"] = sources[0] if sources else cleaned["citation_source"]
+                # Set citation_source to first (required field, backward compat)
+                cleaned["citation_source"] = sources[0]
+            elif sources_field:
+                # Single source - still create list for consistency
+                cleaned["citation_sources"] = [sources_field]
+                cleaned["citation_source"] = sources_field
 
             # Create CitationRecord, only including fields that are in the model
             citation = CitationRecord(**cleaned)  # type: ignore[arg-type]
@@ -95,12 +102,12 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
             # Convert to dict
             data = citation.model_dump(exclude_none=False, mode="python")
 
-            # Handle citation_sources: serialize list to comma-separated string
+            # Serialize citation_sources list to comma-separated string
             if "citation_sources" in data and data["citation_sources"]:
-                data["citation_source"] = ", ".join(data["citation_sources"])
-                del data["citation_sources"]
-            elif "citation_sources" in data:
-                del data["citation_sources"]
+                data["citation_sources"] = ", ".join(data["citation_sources"])
+            # Remove citation_source (singular, deprecated field) from output
+            if "citation_source" in data:
+                del data["citation_source"]
 
             # Convert None to empty string for TSV
             cleaned = {k: ("" if v is None else str(v)) for k, v in data.items()}

@@ -106,21 +106,21 @@ def test_tsv_save_multisource(tmp_path: Path) -> None:
     tsv_path = tmp_path / "test.tsv"
     tsv_io.save_citations([citation], tsv_path)
 
-    # Read the TSV file and check citation_source column
+    # Read the TSV file and check citation_sources column
     content = tsv_path.read_text()
     lines = content.strip().split("\n")
 
     # Header + 1 data row
     assert len(lines) == 2
 
-    # Check that citation_source is comma-separated
+    # Check that citation_sources is comma-separated
     headers = lines[0].split("\t")
     values = lines[1].split("\t")
 
-    citation_source_idx = headers.index("citation_source")
-    citation_source_value = values[citation_source_idx]
+    citation_sources_idx = headers.index("citation_sources")
+    citation_sources_value = values[citation_sources_idx]
 
-    assert citation_source_value == "crossref, datacite, openalex"
+    assert citation_sources_value == "crossref, datacite, openalex"
 
 
 @pytest.mark.ai_generated
@@ -144,7 +144,7 @@ def test_tsv_load_multisource(tmp_path: Path) -> None:
         "",  # citation_journal
         "Cites",  # citation_relationship
         "",  # citation_type
-        "crossref, datacite, openalex",  # citation_source (multi-source!)
+        "crossref, datacite, openalex",  # citation_sources (comma-separated)
         "",  # discovered_date
         "active",  # citation_status
         "",  # citation_merged_into
@@ -174,6 +174,57 @@ def test_tsv_load_multisource(tmp_path: Path) -> None:
     # citation_source should not be set (was removed during parsing)
     # Actually, the model requires citation_source, so it will use first from list
     # Let me check the load code...
+
+
+@pytest.mark.ai_generated
+def test_tsv_load_backward_compat_old_column(tmp_path: Path) -> None:
+    """Test backward compatibility - load old TSV with citation_source (singular) column."""
+    # Create TSV with OLD column name (citation_source instead of citation_sources)
+    old_columns = [
+        col if col != "citation_sources" else "citation_source" for col in tsv_io.TSV_COLUMNS
+    ]
+    headers = "\t".join(old_columns)
+    values = [
+        "dandi.000003",  # item_id
+        "0.210812.1448",  # item_flavor
+        "doi",  # item_ref_type
+        "10.48324/dandi.000003/0.210812.1448",  # item_ref_value
+        "Test",  # item_name
+        "10.1234/test",  # citation_doi
+        "",  # citation_pmid
+        "",  # citation_arxiv
+        "",  # citation_url
+        "Test Article",  # citation_title
+        "",  # citation_authors
+        "",  # citation_year
+        "",  # citation_journal
+        "Cites",  # citation_relationship
+        "",  # citation_type
+        "crossref, datacite, openalex",  # citation_source (OLD column name)
+        "",  # discovered_date
+        "active",  # citation_status
+        "",  # citation_merged_into
+        "",  # citation_comment
+        "",  # curated_by
+        "",  # curated_date
+        "",  # oa_status
+        "",  # pdf_url
+        "",  # pdf_path
+    ]
+    tsv_content = f"{headers}\n{chr(9).join(values)}\n"
+
+    tsv_path = tmp_path / "old-format.tsv"
+    tsv_path.write_text(tsv_content)
+
+    # Load should still work
+    citations = tsv_io.load_citations(tsv_path)
+
+    assert len(citations) == 1
+    citation = citations[0]
+
+    # Should parse into citation_sources list
+    assert citation.citation_sources is not None
+    assert set(citation.citation_sources) == {"crossref", "datacite", "openalex"}
 
 
 @pytest.mark.ai_generated
