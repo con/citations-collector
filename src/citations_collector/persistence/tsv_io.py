@@ -23,7 +23,7 @@ TSV_COLUMNS = [
     "citation_authors",
     "citation_year",
     "citation_journal",
-    "citation_relationship",
+    "citation_relationships",  # Plural - can contain comma-separated values
     "citation_type",
     "citation_sources",  # Plural - can contain comma-separated values
     "discovered_date",
@@ -85,6 +85,23 @@ def load_citations(path: Path) -> list[CitationRecord]:
                 cleaned["citation_source"] = "manual"
                 cleaned["citation_sources"] = ["manual"]
 
+            # Parse citation_relationships from TSV (comma-separated)
+            # Support both old "citation_relationship" and new "citation_relationships" columns
+            relationships_field = cleaned.get("citation_relationships") or cleaned.get(
+                "citation_relationship"
+            )
+            if relationships_field and "," in str(relationships_field):
+                # Multiple relationships - parse into list
+                relationships = [r.strip() for r in relationships_field.split(",")]
+                cleaned["citation_relationships"] = relationships
+                # Set citation_relationship to first (required field, backward compat)
+                cleaned["citation_relationship"] = relationships[0]
+            elif relationships_field:
+                # Single relationship - still create list for consistency
+                cleaned["citation_relationships"] = [relationships_field]
+                cleaned["citation_relationship"] = relationships_field
+            # If neither field is present, validator will auto-populate from citation_relationship
+
             # Create CitationRecord, only including fields that are in the model
             citation = CitationRecord(**cleaned)  # type: ignore[arg-type]
             citations.append(citation)
@@ -116,9 +133,22 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
                     # Empty list -> empty string (not "[]")
                     data["citation_sources"] = ""
 
-            # Remove citation_source (singular, deprecated field) from output
+            # Serialize citation_relationships list to comma-separated string
+            if "citation_relationships" in data:
+                if data["citation_relationships"]:
+                    # Convert enum values to strings
+                    data["citation_relationships"] = ", ".join(
+                        str(r) for r in data["citation_relationships"]
+                    )
+                else:
+                    # Empty list -> empty string (not "[]")
+                    data["citation_relationships"] = ""
+
+            # Remove deprecated singular fields from output
             if "citation_source" in data:
                 del data["citation_source"]
+            if "citation_relationship" in data:
+                del data["citation_relationship"]
 
             # Convert None to empty string for TSV
             # Also handle empty lists that weren't already converted

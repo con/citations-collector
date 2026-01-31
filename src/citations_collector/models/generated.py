@@ -363,7 +363,10 @@ class CitationRecord(ConfiguredBaseModel):
     citation_year: Optional[int] = Field(default=None, description="""Publication year of the citing work.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'],
          'exact_mappings': ['dcterms:issued', 'schema:datePublished']} })
     citation_journal: Optional[str] = Field(default=None, description="""Journal or venue of the citing work.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'], 'exact_mappings': ['schema:isPartOf']} })
-    citation_relationship: CitationRelationship = Field(default=..., description="""How the citing work relates to the item.""", json_schema_extra = { "linkml_meta": {'comments': ['Uses CiTO property to characterize the nature of the citation.'],
+    citation_relationship: CitationRelationship = Field(default=..., description="""DEPRECATED: Use citation_relationships instead. Primary relationship type (kept for backward compatibility).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    citation_relationships: Optional[list[CitationRelationship]] = Field(default=[], description="""How the citing work relates to the item. Can have multiple relationship types. Example: [\"Cites\", \"Uses\"] for a paper that both cites and uses data from a dataset. Must be coherent with citation_relationship (first value).""", json_schema_extra = { "linkml_meta": {'comments': ['In CiTO terms, a citation can have multiple characterizations.',
+                      'Common combinations: Cites+Uses, IsDocumentedBy+Extends, '
+                      'References+IsDerivedFrom.'],
          'domain_of': ['CitationRecord'],
          'slot_uri': 'cito:hasCitationCharacterization'} })
     citation_type: Optional[CitationType] = Field(default=None, description="""Type of the citing work.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'],
@@ -448,6 +451,31 @@ class CitationRecord(ConfiguredBaseModel):
 
         if errors:
             raise ValueError("citation_sources and discovered_dates must be coherent. " + "; ".join(errors))
+
+        return self
+
+    @model_validator(mode='after')
+    def validate_relationships_coherence(self):
+        """Validate that citation_relationship and citation_relationships are coherent.
+
+        NOTE: This validator is manually added and must be preserved when
+        regenerating models from schema. LinkML does not yet support
+        cross-field validation rules.
+
+        Validation rules:
+        - citation_relationship (singular) must match first element of citation_relationships
+        - If citation_relationships is empty, create from citation_relationship
+        """
+        # Ensure citation_relationships is populated
+        if not self.citation_relationships:
+            # Auto-populate from singular field for backward compat
+            self.citation_relationships = [self.citation_relationship]
+        elif self.citation_relationship != self.citation_relationships[0]:
+            # Enforce coherence: singular must match first element
+            raise ValueError(
+                f"citation_relationship ({self.citation_relationship}) must match "
+                f"first element of citation_relationships ({self.citation_relationships[0]})"
+            )
 
         return self
 

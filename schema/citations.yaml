@@ -362,13 +362,24 @@ classes:
 
       # Relationship metadata
       citation_relationship:
-        description: How the citing work relates to the item.
+        description: >-
+          DEPRECATED: Use citation_relationships instead.
+          Primary relationship type (kept for backward compatibility).
         range: CitationRelationship
         required: true
+      citation_relationships:
+        description: >-
+          How the citing work relates to the item. Can have multiple relationship types.
+          Example: ["Cites", "Uses"] for a paper that both cites and uses data from a dataset.
+          Must be coherent with citation_relationship (first value).
+        range: CitationRelationship
+        multivalued: true
         slot_uri: cito:hasCitationCharacterization
         comments:
           - >-
-            Uses CiTO property to characterize the nature of the citation.
+            In CiTO terms, a citation can have multiple characterizations.
+          - >-
+            Common combinations: Cites+Uses, IsDocumentedBy+Extends, References+IsDerivedFrom.
       citation_type:
         description: Type of the citing work.
         range: CitationType
