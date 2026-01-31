@@ -10,6 +10,7 @@
 
 #### 🐛 Bug Fix
 
+- **CRITICAL: Fix bioRxiv/Cloudflare 403 errors** - Remove custom User-Agent that triggered bot detection, use default python-requests User-Agent
 - Rename TSV column from citation_source to citation_sources (plural) for clarity
 - Fix re-download prevention - Check both .pdf and .html extensions before downloading
 - Fix TSV backward compatibility - Support both old citation_source and new citation_sources columns

@@ -71,11 +71,12 @@ class PDFAcquirer:
         self.unpaywall = UnpaywallClient(email=email)
         self.git_annex = git_annex
 
-        # Create session with retry logic and proper User-Agent
+        # Create session with retry logic
+        # Note: Do NOT set custom User-Agent - it triggers Cloudflare bot detection on bioRxiv
+        # The default python-requests User-Agent passes through Cloudflare successfully
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": f"citations-collector/0.2 (mailto:{email})",
                 "Accept": "application/pdf,*/*",
             }
         )
