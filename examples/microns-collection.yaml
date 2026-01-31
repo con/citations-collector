@@ -10,12 +10,6 @@ source:
   dandiset_ids:
   - '000402'
 discover:
-  # sources: If not specified, uses all available sources (crossref, opencitations, datacite, openalex)
-  # sources:
-  # - crossref
-  # - opencitations
-  # - datacite
-  # - openalex
   email: site-unpaywall@oneukrainian.com
 pdfs:
   output_dir: microns-pdfs/

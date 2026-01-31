@@ -65,6 +65,14 @@ def load_citations(path: Path) -> list[CitationRecord]:
                 with suppress(ValueError):
                     cleaned["citation_year"] = int(cleaned["citation_year"])  # type: ignore[arg-type]
 
+            # Parse citation_source: if it contains commas, it's multiple sources
+            if cleaned.get("citation_source") and "," in str(cleaned["citation_source"]):
+                cleaned["citation_sources"] = [
+                    s.strip() for s in cleaned["citation_source"].split(",")
+                ]
+                # Remove citation_source so model uses citation_sources
+                del cleaned["citation_source"]
+
             # Create CitationRecord, only including fields that are in the model
             citation = CitationRecord(**cleaned)  # type: ignore[arg-type]
             citations.append(citation)
@@ -87,6 +95,13 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
         for citation in citations:
             # Convert to dict
             data = citation.model_dump(exclude_none=False, mode="python")
+
+            # Handle citation_sources: serialize list to comma-separated string
+            if "citation_sources" in data and data["citation_sources"]:
+                data["citation_source"] = ", ".join(data["citation_sources"])
+                del data["citation_sources"]
+            elif "citation_sources" in data:
+                del data["citation_sources"]
 
             # Convert None to empty string for TSV
             cleaned = {k: ("" if v is None else str(v)) for k, v in data.items()}

@@ -1,20 +1,15 @@
 name: DANDI Archive Dandisets
-description: All DANDI dandisets tracked via BibTeX file maintained by dandi-citations tool
+description: All DANDI dandisets tracked via BibTeX file maintained by dandi-citations
+  tool
 homepage: https://dandiarchive.org
-
+output_tsv: dandi-citations.tsv
 source:
   type: bibtex
-  bibtex_file: ../dandi.bib  # Relative to this YAML file
+  include_draft: false
+  bibtex_file: ../dandi.bib
   bib_field: doi
   ref_type: doi
-  ref_regex: '10\.48324/(?P<item_id>dandi\.\d{6})/(?P<flavor_id>[\d.]+)'
-  # update_items omitted (defaults to not modifying YAML items)
-
-# Items section empty - populated from BibTeX
-items: []
-
+  ref_regex: 10\.48324/(?P<item_id>dandi\.\d{6})/(?P<flavor_id>[\d.]+)
 discover:
-  # Uses all available sources by default
   email: admin@dandiarchive.org
-
-output_tsv: dandi-citations.tsv
+items: []
