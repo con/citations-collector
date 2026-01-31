@@ -20,6 +20,9 @@ from citations_collector.models.generated import (
 
 logger = logging.getLogger(__name__)
 
+# Suppress bibtexparser's duplicate key warnings - we handle deduplication ourselves
+logging.getLogger("bibtexparser").setLevel(logging.ERROR)
+
 
 class BibTeXImporter:
     """Import items from BibTeX files with regex-based parsing."""
@@ -53,6 +56,9 @@ class BibTeXImporter:
         """
         Import all entries from BibTeX file.
 
+        Groups entries by item_id, creating one Item per unique item_id
+        with multiple flavors (versions).
+
         Returns:
             Collection with items parsed from BibTeX entries
         """
@@ -62,17 +68,38 @@ class BibTeXImporter:
         # Parse BibTeX file
         library = bibtexparser.parse_file(self.bibtex_file)
 
-        items: list[Item] = []
+        # Group flavors by item_id
+        items_dict: dict[str, dict[str, Any]] = {}
         skipped = 0
 
         for entry in library.entries:
-            item = self._entry_to_item(entry)
-            if item:
-                items.append(item)
+            result = self._entry_to_flavor(entry)
+            if result:
+                item_id, flavor, name = result
+                if item_id not in items_dict:
+                    items_dict[item_id] = {"name": name, "flavors": [], "seen_flavors": set()}
+                # Deduplicate flavors by flavor_id
+                if flavor.flavor_id not in items_dict[item_id]["seen_flavors"]:
+                    items_dict[item_id]["flavors"].append(flavor)
+                    items_dict[item_id]["seen_flavors"].add(flavor.flavor_id)
             else:
                 skipped += 1
 
-        logger.info(f"Imported {len(items)} items from {self.bibtex_file.name}, skipped {skipped}")
+        # Build Item objects with merged flavors
+        items = [
+            Item(
+                item_id=item_id,
+                name=data["name"],
+                flavors=data["flavors"],
+            )
+            for item_id, data in items_dict.items()
+        ]
+
+        total_flavors = sum(len(item.flavors) for item in items)
+        logger.info(
+            f"Imported {len(items)} items ({total_flavors} flavors) "
+            f"from {self.bibtex_file.name}, skipped {skipped}"
+        )
 
         return Collection(
             name=f"BibTeX: {self.bibtex_file.stem}",
@@ -80,15 +107,15 @@ class BibTeXImporter:
             items=items,
         )
 
-    def _entry_to_item(self, entry: Any) -> Item | None:
+    def _entry_to_flavor(self, entry: Any) -> tuple[str, ItemFlavor, str] | None:
         """
-        Convert BibTeX entry to Item.
+        Convert BibTeX entry to flavor components.
 
         Args:
             entry: BibTeX entry from bibtexparser
 
         Returns:
-            Item if reference can be parsed, None otherwise
+            Tuple of (item_id, flavor, name) if reference can be parsed, None otherwise
         """
         # Get reference value from specified field
         ref_value = entry.fields_dict.get(self.bib_field)
@@ -130,14 +157,9 @@ class BibTeXImporter:
             refs=[item_ref],
         )
 
-        # Build Item
-        item = Item(
-            item_id=item_id,
-            name=title or item_id,
-            flavors=[flavor],
-        )
-
-        return item
+        # Return components for grouping by item_id
+        item_name = title or item_id
+        return (item_id, flavor, item_name)
 
     def _get_field(self, entry: Any, field_name: str) -> str | None:
         """Extract field value from BibTeX entry."""
