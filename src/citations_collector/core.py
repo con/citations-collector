@@ -41,6 +41,7 @@ class CitationCollector:
         self.collection = collection
         self.collection_path = collection_path
         self.citations: list[CitationRecord] = []
+        self._skip_yaml_save = False  # Flag to skip YAML save when items from external source
 
     @classmethod
     def from_yaml(cls, path: Path) -> CitationCollector:
@@ -192,9 +193,10 @@ class CitationCollector:
             self.collection.items.extend(new_items)
             logger.info(f"Added {len(new_items)} new items from BibTeX")
         else:
-            # update_items: false - don't modify YAML, just use BibTeX items for discovery
-            # Replace items temporarily for discovery, but won't be saved
+            # update_items: false/omitted - don't modify YAML, just use BibTeX items for discovery
+            # Replace items temporarily for discovery, but won't be saved to YAML
             self.collection.items = bib_collection.items
+            self._skip_yaml_save = True  # Don't save YAML - items maintained externally
             logger.info(
                 f"Loaded {len(bib_collection.items)} items from BibTeX (not saving to YAML)"
             )
@@ -449,5 +451,9 @@ class CitationCollector:
             yaml_path: Path to output collection YAML
             tsv_path: Path to output citations TSV
         """
-        yaml_io.save_collection(self.collection, yaml_path)
+        # Only save YAML if items are managed in YAML (not external source)
+        if not self._skip_yaml_save:
+            yaml_io.save_collection(self.collection, yaml_path)
+        else:
+            logger.info("Skipping YAML save - items managed externally")
         tsv_io.save_citations(self.citations, tsv_path)
