@@ -2,3 +2,20 @@
 __pycache__/
 *.lock
 src/citations_collector/_version.py
+
+# Development and testing artifacts
+.cache/
+.local/
+.coverage
+*.log
+dist/
+test-pdfs/
+
+# Test data files (keep in tests/fixtures/)
+/*.tsv
+/*.yaml
+/*.bib
+cache
+.coverage
+.local
+.claude/settings.local.json

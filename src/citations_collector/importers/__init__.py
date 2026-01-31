@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from citations_collector.importers.bibtex import BibTeXImporter
 from citations_collector.importers.dandi import DANDIImporter
 from citations_collector.importers.github import GitHubMapper
 from citations_collector.importers.zenodo import ZenodoExpander
 from citations_collector.importers.zotero import ZoteroImporter
 
 __all__ = [
+    "BibTeXImporter",
     "DANDIImporter",
     "GitHubMapper",
     "ZenodoExpander",

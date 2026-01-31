@@ -28,14 +28,16 @@ class CitationCollector:
     and saving results.
     """
 
-    def __init__(self, collection: Collection) -> None:
+    def __init__(self, collection: Collection, collection_path: Path | None = None) -> None:
         """
         Initialize with a Collection object.
 
         Args:
             collection: Collection object to manage
+            collection_path: Path to collection YAML file (for resolving relative paths)
         """
         self.collection = collection
+        self.collection_path = collection_path
         self.citations: list[CitationRecord] = []
 
     @classmethod
@@ -50,7 +52,7 @@ class CitationCollector:
             CitationCollector instance
         """
         collection = yaml_io.load_collection(path)
-        return cls(collection)
+        return cls(collection, collection_path=path)
 
     def populate_from_source(
         self, progress_callback: Callable[[int, int | None], None] | None = None
@@ -75,6 +77,8 @@ class CitationCollector:
 
         if source_type == "dandi":
             self._populate_from_dandi(progress_callback)
+        elif source_type == "bibtex":
+            self._populate_from_bibtex(progress_callback)
         else:
             logger.warning(f"Unknown source type: {source_type}")
 
@@ -112,6 +116,89 @@ class CitationCollector:
                 logger.info(f"Added item from DANDI: {item.item_id}")
             else:
                 logger.debug(f"Skipping duplicate item: {item.item_id}")
+
+    def _populate_from_bibtex(
+        self, progress_callback: Callable[[int, int | None], None] | None = None
+    ) -> None:
+        """
+        Populate items from BibTeX source.
+
+        Reads BibTeX file specified in source config, parses entries using
+        regex pattern to extract item_id and flavor_id.
+        """
+        from citations_collector.importers import BibTeXImporter
+
+        source = self.collection.source
+        if not source:
+            return
+
+        # Resolve path relative to collection file location
+        bibtex_file = Path(source.bibtex_file) if source.bibtex_file else None
+        if not bibtex_file:
+            logger.error("BibTeX source requires bibtex_file to be specified")
+            return
+
+        if not bibtex_file.is_absolute() and self.collection_path:
+            # Resolve relative to collection YAML directory
+            bibtex_file = (self.collection_path.parent / bibtex_file).resolve()
+
+        if not bibtex_file.exists():
+            logger.error(f"BibTeX file not found: {bibtex_file}")
+            return
+
+        # Validate required fields
+        if not source.bib_field:
+            logger.error("BibTeX source requires bib_field to be specified")
+            return
+        if not source.ref_type:
+            logger.error("BibTeX source requires ref_type to be specified")
+            return
+        if not source.ref_regex:
+            logger.error("BibTeX source requires ref_regex to be specified")
+            return
+
+        if progress_callback:
+            progress_callback(0, None)
+
+        logger.info(f"Reading BibTeX from {bibtex_file.name}")
+
+        # Import from BibTeX
+        importer = BibTeXImporter(
+            bibtex_file=bibtex_file,
+            bib_field=source.bib_field,
+            ref_type=source.ref_type,
+            ref_regex=source.ref_regex,
+        )
+
+        try:
+            bib_collection = importer.import_all()
+        except Exception as e:
+            logger.error(f"Failed to import from BibTeX: {e}")
+            return
+
+        # Handle update_items setting
+        if source.update_items == "sync":
+            # Replace all items with BibTeX items
+            self.collection.items = bib_collection.items
+            logger.info(f"Synced {len(bib_collection.items)} items from BibTeX")
+        elif source.update_items == "add":
+            # Add only new items (by item_id)
+            if not self.collection.items:
+                self.collection.items = []
+            existing_ids = {item.item_id for item in self.collection.items}
+            new_items = [item for item in bib_collection.items if item.item_id not in existing_ids]
+            self.collection.items.extend(new_items)
+            logger.info(f"Added {len(new_items)} new items from BibTeX")
+        else:
+            # update_items: false - don't modify YAML, just use BibTeX items for discovery
+            # Replace items temporarily for discovery, but won't be saved
+            self.collection.items = bib_collection.items
+            logger.info(
+                f"Loaded {len(bib_collection.items)} items from BibTeX (not saving to YAML)"
+            )
+
+        if progress_callback:
+            progress_callback(len(bib_collection.items), len(bib_collection.items))
 
     def expand_refs(
         self,

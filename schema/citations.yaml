@@ -339,7 +339,7 @@ classes:
     attributes:
       type:
         description: >-
-          Source type: "dandi", "zenodo_org", "zenodo_collection",
+          Source type: "dandi", "bibtex", "zenodo_org", "zenodo_collection",
           "github_org", "yaml", etc.
       update_items:
         description: >-
@@ -359,6 +359,26 @@ classes:
           List of specific DANDI dandiset identifiers to import
           (e.g., ["000003", "000402"]). If not specified, imports all dandisets.
         multivalued: true
+
+      # BibTeX-specific fields
+      bibtex_file:
+        description: Path to BibTeX file (relative to collection YAML or absolute).
+        range: string
+        required: false
+      bib_field:
+        description: BibTeX field to extract reference from (e.g., 'doi', 'url').
+        range: string
+        required: false
+      ref_type:
+        description: Type of reference extracted from bib_field.
+        range: RefType
+        required: false
+      ref_regex:
+        description: >-
+          Regex pattern with named groups (?P<item_id>...) and optionally (?P<flavor_id>...)
+          to parse reference into components. If flavor_id not captured, uses 'main'.
+        range: string
+        required: false
 
   DiscoverConfig:
     description: >-
