@@ -344,11 +344,12 @@ class CitationCollector:
         )
 
         # Create progress bar
+        # Disable only if DEBUG logging is enabled (so debug messages are visible)
         with tqdm(
             total=total_refs * len(discoverers),
             desc="Discovering citations",
             unit="query",
-            disable=logger.level < logging.INFO,  # Disable if verbose logging
+            disable=logger.getEffectiveLevel() <= logging.DEBUG,
         ) as pbar:
             for item in self.collection.items:
                 for flavor in item.flavors:

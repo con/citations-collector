@@ -126,7 +126,6 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
             if not cursor or not results:
                 break
 
-        logger.info(f"Found {len(citations)} citations for {doi} via OpenAlex")
         return citations
 
     def _resolve_doi_to_id(self, doi: str) -> str | None:
