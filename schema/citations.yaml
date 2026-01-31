@@ -99,6 +99,68 @@ enums:
           - datacite:IsDerivedFrom
         broad_mappings:
           - cito:obtainsSupportFrom
+      CitesAsDataSource:
+        description: >-
+          The work explicitly cites the item as a source of data.
+          More specific than generic Cites for data reuse scenarios.
+        meaning: cito:citesAsDataSource
+        exact_mappings:
+          - datacite:References
+        comments:
+          - >-
+            Use when paper explicitly acknowledges using data from a dataset.
+          - >-
+            Distinguishes explicit data citation from general reference.
+          - >-
+            Common in papers that analyze existing datasets for new insights.
+      Reviews:
+        description: >-
+          The work reviews, evaluates, or critically assesses the cited item.
+        meaning: cito:reviews
+        exact_mappings:
+          - datacite:Reviews
+        comments:
+          - >-
+            Use for systematic reviews, dataset evaluations, quality assessments.
+          - >-
+            Example: "A comprehensive review of publicly available EEG datasets"
+      CitesAsEvidence:
+        description: >-
+          The work uses the cited item as evidence to support claims or validate methods.
+        meaning: cito:citesAsEvidence
+        comments:
+          - >-
+            Use for validation studies, benchmarking, method comparison.
+          - >-
+            Example: "We validated our algorithm against dataset X"
+          - >-
+            Distinguishes validation from active data reuse (Uses/UsesDataFrom).
+      Compiles:
+        description: >-
+          The work compiles or aggregates data from multiple datasets including this one.
+        meaning: cito:compiles
+        comments:
+          - >-
+            CiTO inverse property: cito:isCompiledBy
+          - >-
+            Use for meta-analyses combining multiple datasets.
+          - >-
+            Should be combined with citation_comment listing other datasets.
+          - >-
+            Example: "Meta-analysis combining datasets A, B, and C"
+          - >-
+            Multi-dataset papers create multiple TSV rows with same citation_doi.
+      CitesForInformation:
+        description: >-
+          The work cites the item as background information or context.
+        meaning: cito:citesForInformation
+        comments:
+          - >-
+            Use for contextual/background references, tutorials, educational materials.
+          - >-
+            More specific than generic References.
+          - >-
+            Example: Tutorial mentioning dataset availability.
 
   CitationType:
     description: >-

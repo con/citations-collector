@@ -183,6 +183,26 @@ class CitationRelationship(str, Enum):
     """
     The work is derived from the item.
     """
+    CitesAsDataSource = "CitesAsDataSource"
+    """
+    The work explicitly cites the item as a source of data. More specific than generic Cites for data reuse scenarios.
+    """
+    Reviews = "Reviews"
+    """
+    The work reviews, evaluates, or critically assesses the cited item.
+    """
+    CitesAsEvidence = "CitesAsEvidence"
+    """
+    The work uses the cited item as evidence to support claims or validate methods.
+    """
+    Compiles = "Compiles"
+    """
+    The work compiles or aggregates data from multiple datasets including this one.
+    """
+    CitesForInformation = "CitesForInformation"
+    """
+    The work cites the item as background information or context.
+    """
 
 
 class CitationType(str, Enum):
