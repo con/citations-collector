@@ -103,13 +103,17 @@ class DataCiteDiscoverer(AbstractDiscoverer):
             params["occurred-since"] = since.strftime("%Y-%m-%d")
 
         try:
+            # Increase timeout to 60s - Event Data API can be slow for some queries
             response = self.session.get(
                 self.EVENT_DATA_URL,
                 params=params,
-                timeout=30,  # type: ignore[arg-type]
+                timeout=60,  # type: ignore[arg-type]
             )
             response.raise_for_status()
             data = response.json()
+        except requests.Timeout:
+            logger.warning(f"DataCite Event Data API timeout for {doi} (query took >60s)")
+            return []
         except requests.RequestException as e:
             logger.warning(f"DataCite Event Data API error for {doi}: {e}")
             return []

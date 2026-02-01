@@ -86,9 +86,13 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             params["from-updated-date"] = date_str
 
         try:
-            response = self.session.get(self.BASE_URL, params=params, timeout=30)
+            # Increase timeout to 60s - Event Data API can be slow for some queries
+            response = self.session.get(self.BASE_URL, params=params, timeout=60)
             response.raise_for_status()
             data = response.json()
+        except requests.Timeout:
+            logger.warning(f"CrossRef Event Data API timeout for {doi} (query took >60s)")
+            return []
         except requests.RequestException as e:
             logger.warning(f"CrossRef Event Data API error for {doi}: {e}")
             return []

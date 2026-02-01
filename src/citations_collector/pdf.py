@@ -226,6 +226,20 @@ class PDFAcquirer:
                     f.write(chunk)
             logger.info("Downloaded %s", dest)
             return dest
+        except requests.HTTPError as e:
+            if e.response.status_code == 403:
+                # 403 Forbidden - likely paywalled content or aggressive bot protection
+                # Common for Oxford Academic, Elsevier, etc.
+                logger.debug(
+                    "Download blocked (403 Forbidden) for %s - "
+                    "likely paywalled or bot-protected content",
+                    url,
+                )
+            else:
+                logger.warning("Download failed for %s: HTTP %s", url, e.response.status_code)
+            if dest.exists():
+                dest.unlink()
+            return None
         except requests.RequestException as e:
             logger.warning("Download failed for %s: %s", url, e)
             if dest.exists():

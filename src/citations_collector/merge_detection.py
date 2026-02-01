@@ -97,6 +97,14 @@ class MergeDetector:
                 # (this is a fallback and should be used carefully)
                 pass
 
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                # 404 is expected for non-CrossRef DOIs (Zenodo, arXiv, G-Node, etc.)
+                logger.debug(
+                    f"DOI {doi} not in CrossRef (404 - expected for Zenodo/arXiv/G-Node DOIs)"
+                )
+            else:
+                logger.warning(f"Failed to check CrossRef for {doi}: HTTP {e.response.status_code}")
         except requests.RequestException as e:
             logger.warning(f"Failed to check CrossRef for {doi}: {e}")
         except (KeyError, ValueError) as e:

@@ -155,6 +155,17 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
                 logger.debug(f"Resolved DOI {doi} to OpenAlex ID {openalex_id}")
                 return openalex_id
 
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                # 404 is expected for very new DOIs - OpenAlex hasn't indexed them yet
+                logger.debug(
+                    f"DOI {doi} not yet indexed in OpenAlex "
+                    "(404 - normal for recent publications)"
+                )
+            else:
+                logger.warning(
+                    f"Failed to resolve DOI {doi} to OpenAlex ID: HTTP {e.response.status_code}"
+                )
         except requests.RequestException as e:
             logger.warning(f"Failed to resolve DOI {doi} to OpenAlex ID: {e}")
 
