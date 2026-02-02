@@ -705,5 +705,268 @@ def extract_contexts(
         click.echo(f"\n✓ Added {extracted_count} files to git-annex with metadata")
 
 
+@main.command()
+@click.argument("collection", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--backend",
+    type=click.Choice(["ollama", "dartmouth", "openrouter", "openai"]),
+    default="ollama",
+    help="LLM backend to use for classification",
+)
+@click.option(
+    "--model",
+    type=str,
+    help="Model name (backend-specific, e.g., qwen2:7b for Ollama)",
+)
+@click.option(
+    "--confidence-threshold",
+    type=float,
+    default=0.7,
+    help="Minimum confidence to accept classification (0.0-1.0)",
+)
+@click.option(
+    "--review",
+    is_flag=True,
+    help="Enable interactive review mode for low-confidence classifications",
+)
+@click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path),
+    help="Directory containing extracted_citations.json files",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be classified without updating TSV",
+)
+def classify(
+    collection: Path,
+    backend: str,
+    model: str | None,
+    confidence_threshold: float,
+    review: bool,
+    output_dir: Path | None,
+    dry_run: bool,
+) -> None:
+    """Classify citation relationships using LLM.
+
+    Reads extracted_citations.json files created by extract-contexts,
+    sends contexts to LLM for classification, and updates the citations
+    TSV with relationship types and confidence scores.
+
+    Requires extracted_citations.json files created by extract-contexts.
+    """
+    from citations_collector.classifier import CitationClassifier
+    from citations_collector.persistence import tsv_io
+
+    click.echo(f"Loading collection from {collection}")
+
+    # Load collection
+    coll = yaml_io.load_collection(collection)
+
+    # Resolve output_dir
+    if not output_dir:
+        if coll.pdfs and coll.pdfs.output_dir:
+            output_dir = Path(coll.pdfs.output_dir)
+        else:
+            output_dir = Path("pdfs")
+
+    # Load citations TSV
+    tsv_path = Path(coll.output_tsv) if coll.output_tsv else Path("citations.tsv")
+    if not tsv_path.exists():
+        click.echo(f"Error: Citations TSV not found: {tsv_path}", err=True)
+        click.echo("Run 'citations-collector discover' first", err=True)
+        raise click.Abort()
+
+    citations = tsv_io.load_citations(tsv_path)
+
+    # Build citation lookup by (doi, item_id)
+    citation_lookup = {
+        (c.citation_doi, c.item_id): c for c in citations if c.citation_doi
+    }
+
+    click.echo(f"Loaded {len(citations)} citations from {tsv_path}")
+    click.echo(f"Using {backend} backend for classification")
+    if model:
+        click.echo(f"Model: {model}")
+
+    # Create classifier
+    try:
+        classifier = CitationClassifier.from_config(
+            backend_type=backend,
+            model=model,
+            confidence_threshold=confidence_threshold,
+        )
+    except Exception as e:
+        click.echo(f"Error creating classifier: {e}", err=True)
+        click.echo("\nTroubleshooting:", err=True)
+        if backend == "ollama":
+            click.echo("  - Check Ollama is running (or SSH tunnel active)", err=True)
+            click.echo("  - Test with: curl http://localhost:11434/api/tags", err=True)
+        elif backend == "dartmouth":
+            click.echo(
+                "  - Check DARTMOUTH_API_TOKEN is set in environment or secrets",
+                err=True,
+            )
+        raise click.Abort()
+
+    click.echo(f"Confidence threshold: {confidence_threshold:.2f}")
+    click.echo(f"Output directory: {output_dir}\n")
+
+    # Find papers with extracted contexts
+    papers_to_classify = []
+    for doi in {c.citation_doi for c in citations if c.citation_doi}:
+        doi_path = output_dir / doi
+        json_path = doi_path / "extracted_citations.json"
+
+        if json_path.exists():
+            papers_to_classify.append((doi, json_path))
+
+    if not papers_to_classify:
+        click.echo(
+            "No extracted_citations.json files found. "
+            "Run 'citations-collector extract-contexts' first.",
+            err=True,
+        )
+        raise click.Abort()
+
+    click.echo(f"Found {len(papers_to_classify)} papers with extracted contexts\n")
+
+    # Classify
+    classified_count = 0
+    low_confidence_count = 0
+    error_count = 0
+    updates = []  # (doi, item_id, relationship, confidence, reasoning)
+
+    for doi, json_path in papers_to_classify:
+        click.echo(f"Classifying: {doi}")
+
+        try:
+            results = classifier.classify_from_extracted_file(json_path)
+
+            for dataset_id, result in results:
+                # Look up citation record
+                citation = citation_lookup.get((doi, dataset_id))
+                if not citation:
+                    click.echo(
+                        f"  Warning: No citation record for {dataset_id}",
+                        err=True,
+                    )
+                    continue
+
+                # Check if needs review
+                needs_review = classifier.should_review(result)
+                confidence_marker = (
+                    "⚠" if needs_review else "✓"
+                )
+
+                click.echo(
+                    f"  {confidence_marker} {dataset_id}: "
+                    f"{result.relationship_type} "
+                    f"(confidence: {result.confidence:.2f})"
+                )
+
+                if needs_review:
+                    low_confidence_count += 1
+                    click.echo(f"    Reasoning: {result.reasoning}")
+
+                    if review and not dry_run:
+                        # Interactive review
+                        click.echo("\n    Context:")
+                        for i, ctx in enumerate(result.context_used[:2], 1):
+                            click.echo(f"      [{i}] {ctx[:200]}...")
+
+                        click.echo(
+                            f"\n    Suggested: {result.relationship_type} "
+                            f"({result.confidence:.2f})"
+                        )
+                        response = click.prompt(
+                            "    Accept/Edit/Skip? (a/e/s)",
+                            type=str,
+                            default="a",
+                        )
+
+                        if response.lower() == "s":
+                            click.echo("    Skipped")
+                            continue
+                        elif response.lower() == "e":
+                            new_type = click.prompt(
+                                "    Enter relationship type",
+                                type=str,
+                                default=result.relationship_type,
+                            )
+                            result.relationship_type = new_type
+                            result.confidence = 1.0  # Manual override
+
+                # Store update
+                updates.append(
+                    (
+                        doi,
+                        dataset_id,
+                        result.relationship_type,
+                        result.confidence,
+                        result.reasoning,
+                    )
+                )
+
+                classified_count += 1
+
+        except Exception as e:
+            click.echo(f"  ✗ Error: {e}", err=True)
+            error_count += 1
+
+    # Summary
+    click.echo("\n" + "=" * 60)
+    click.echo(f"Classified: {classified_count}")
+    click.echo(f"Low confidence: {low_confidence_count}")
+    click.echo(f"Errors: {error_count}")
+
+    if dry_run:
+        click.echo("\n[DRY RUN] TSV not updated")
+        return
+
+    # Update TSV
+    if updates:
+        click.echo(f"\nUpdating {tsv_path}...")
+
+        # Update citation records
+        from citations_collector.models.generated import CitationRelationship
+
+        for doi, item_id, relationship, confidence, reasoning in updates:
+            citation = citation_lookup.get((doi, item_id))
+            if citation:
+                # Update relationship (use enum value)
+                try:
+                    rel_enum = CitationRelationship(relationship)
+                    citation.citation_relationship = rel_enum
+                    # Also update the list field
+                    if not citation.citation_relationships:
+                        citation.citation_relationships = []
+                    if rel_enum not in citation.citation_relationships:
+                        citation.citation_relationships = [rel_enum]
+                except ValueError:
+                    click.echo(
+                        f"Warning: Invalid relationship type '{relationship}' "
+                        f"for {item_id}, skipping",
+                        err=True,
+                    )
+                    continue
+
+                # Store confidence and reasoning in comment field
+                comment_parts = []
+                if citation.citation_comment:
+                    comment_parts.append(citation.citation_comment)
+                comment_parts.append(
+                    f"[LLM classified: confidence={confidence:.2f}]"
+                )
+                if confidence < confidence_threshold:
+                    comment_parts.append(f"Reasoning: {reasoning[:200]}")
+                citation.citation_comment = " ".join(comment_parts)
+
+        # Save
+        tsv_io.save_citations(citations, tsv_path)
+        click.echo(f"✓ Updated {len(updates)} citations in {tsv_path}")
+
+
 if __name__ == "__main__":
     main()
