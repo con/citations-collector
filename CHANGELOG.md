@@ -1,42 +1,23 @@
-# 0.2.3 (Mon Feb 02 2026)
+# 0.2.4 (Mon Feb 02 2026)
 
 #### 🐛 Bug Fix
 
-- Fix ruff formatting in openalex.py [#3](https://github.com/con/citations-collector/pull/3) ([@yarikoptic](https://github.com/yarikoptic))
+- **CRITICAL: Fix bioRxiv/Cloudflare 403 errors** - Remove custom User-Agent that triggered bot detection [#3](https://github.com/con/citations-collector/pull/3) ([@yarikoptic](https://github.com/yarikoptic))
+- Improve integration tests to detect User-Agent/Cloudflare issues - Tests now fail on 403 instead of skipping ([@yarikoptic](https://github.com/yarikoptic))
+- Improve robustness: increase API timeouts, better error handling - Event Data APIs now 60s timeout, smarter 404/403 handling ([@yarikoptic](https://github.com/yarikoptic))
+- Fix ruff formatting in openalex.py ([@yarikoptic](https://github.com/yarikoptic))
 
-#### ⚠️ Pushed to `master`
+#### 🚀 Enhancement
 
-- Improve robustness: increase API timeouts, better error handling ([@yarikoptic](https://github.com/yarikoptic))
-- Merge branch 'enh-zotero' ([@yarikoptic](https://github.com/yarikoptic))
-- Add Phase 1 completion summary ([@yarikoptic](https://github.com/yarikoptic))
-- Add comprehensive tooling and integration plan ([@yarikoptic](https://github.com/yarikoptic))
-- Add 5 dataset-specific citation relationship types (Phase 1) ([@yarikoptic](https://github.com/yarikoptic))
-- Add comprehensive plan for dataset-specific citation relationships ([@yarikoptic](https://github.com/yarikoptic))
-- Improve integration tests to detect User-Agent/Cloudflare issues ([@yarikoptic](https://github.com/yarikoptic))
-- Fix bioRxiv/Cloudflare 403 errors by removing custom User-Agent ([@yarikoptic](https://github.com/yarikoptic))
+- Add 5 dataset-specific citation relationship types (Phase 1) - Supports, Describes, Derives, Cites, References ([@yarikoptic](https://github.com/yarikoptic))
+- Add ontology alignment to established vocabularies (Phase 1) - Maps to CiTO, DataCite, BIBO ontologies ([@yarikoptic](https://github.com/yarikoptic))
 - Support multiple citation relationships per citation ([@yarikoptic](https://github.com/yarikoptic))
-- Restore multi-source validation after schema regeneration ([@yarikoptic](https://github.com/yarikoptic))
-- Merge master (v0.2.3) into enh-zotero ([@yarikoptic](https://github.com/yarikoptic))
-- Prepare v0.2.3 release: fix tests, add validation, update CHANGELOG ([@yarikoptic](https://github.com/yarikoptic))
-- Add reference to dandi-bib complete pipeline in README ([@yarikoptic](https://github.com/yarikoptic))
+
+#### 🏠 Internal
+
 - Add comprehensive ontology alignment documentation ([@yarikoptic](https://github.com/yarikoptic))
-- Add ontology alignment to established vocabularies (Phase 1) ([@yarikoptic](https://github.com/yarikoptic))
-- Update README with BibTeX source, multi-source tracking, real examples ([@yarikoptic](https://github.com/yarikoptic))
-- Add comprehensive tests for PDF retry logic and bioRxiv downloads ([@yarikoptic](https://github.com/yarikoptic))
-- Improve PDF download retry logic and rate limiting for bioRxiv ([@yarikoptic](https://github.com/yarikoptic))
-- Rename TSV column from citation_source to citation_sources ([@yarikoptic](https://github.com/yarikoptic))
-- Simplify tqdm logging with logging_redirect_tqdm ([@yarikoptic](https://github.com/yarikoptic))
-- Fix tqdm progress bar to show logging in real-time ([@yarikoptic](https://github.com/yarikoptic))
-- Fix multi-source citation handling and PDF/HTML detection ([@yarikoptic](https://github.com/yarikoptic))
-- Store multi-source citations as single TSV row ([@yarikoptic](https://github.com/yarikoptic))
-- Improve reporting: group by DOI and show all discovery sources ([@yarikoptic](https://github.com/yarikoptic))
-- Centralize citation count reporting and fix progress bar ([@yarikoptic](https://github.com/yarikoptic))
-- Fix BibTeX source to not save items to YAML when update_items is omitted ([@yarikoptic](https://github.com/yarikoptic))
-- Document per-source incremental discovery TODO ([@yarikoptic](https://github.com/yarikoptic))
-- Add tqdm progress bar, improve logging, and add retry logic ([@yarikoptic](https://github.com/yarikoptic))
-- Add debug logging and fix Makefile to use --full-refresh ([@yarikoptic](https://github.com/yarikoptic))
-- Fix BibTeX importer to properly group flavors by item_id ([@yarikoptic](https://github.com/yarikoptic))
-- Add BibTeX source type for external item management ([@yarikoptic](https://github.com/yarikoptic))
+- Add comprehensive tooling and integration plan ([@yarikoptic](https://github.com/yarikoptic))
+- Restore multi-source validation after schema regeneration ([@yarikoptic](https://github.com/yarikoptic))
 
 #### Authors: 1
 
