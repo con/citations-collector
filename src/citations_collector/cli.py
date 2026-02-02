@@ -521,5 +521,189 @@ def detect_merges(
         click.echo("No merges detected")
 
 
+@main.command()
+@click.argument("collection", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path),
+    help="Directory containing PDFs (overrides pdfs.output_dir in YAML)",
+)
+@click.option(
+    "--git-annex/--no-git-annex",
+    default=None,
+    help="Add extracted_citations.json to git-annex with metadata",
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    help="Re-extract even if extracted_citations.json exists",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be extracted without creating files",
+)
+def extract_contexts(
+    collection: Path,
+    output_dir: Path | None,
+    git_annex: bool | None,
+    overwrite: bool,
+    dry_run: bool,
+) -> None:
+    """Extract citation contexts from PDFs/HTMLs for classification.
+
+    Finds dataset mentions in PDFs and HTMLs, extracts paragraph-level
+    contexts around mentions, and saves as extracted_citations.json
+    alongside each paper.
+
+    If --git-annex is enabled, files are added to git-annex with
+    oa_status metadata tags based on the citation's open access status.
+    """
+    from citations_collector.context_extractor import ContextExtractor
+    from citations_collector.git_annex import GitAnnexHelper
+    from citations_collector.persistence import tsv_io
+
+    click.echo(f"Loading collection from {collection}")
+
+    # Load collection
+    coll = yaml_io.load_collection(collection)
+
+    # Resolve output_dir
+    if not output_dir:
+        if coll.pdfs and coll.pdfs.output_dir:
+            output_dir = Path(coll.pdfs.output_dir)
+        else:
+            output_dir = Path("pdfs")
+
+    # Resolve git-annex setting
+    if git_annex is None:
+        if coll.pdfs and coll.pdfs.git_annex is not None:
+            git_annex = coll.pdfs.git_annex
+        else:
+            git_annex = False
+
+    # Load citations TSV
+    tsv_path = Path(coll.output_tsv) if coll.output_tsv else Path("citations.tsv")
+    if not tsv_path.exists():
+        click.echo(f"Error: Citations TSV not found: {tsv_path}", err=True)
+        click.echo("Run 'citations-collector discover' first", err=True)
+        raise click.Abort()
+
+    citations = tsv_io.load_citations(tsv_path)
+
+    # Group citations by DOI
+    papers: dict[str, list[str]] = {}
+    paper_metadata: dict[str, dict] = {}
+
+    for citation in citations:
+        if citation.citation_doi:
+            doi = citation.citation_doi
+
+            if doi not in papers:
+                papers[doi] = []
+                paper_metadata[doi] = {
+                    "title": citation.citation_title,
+                    "journal": citation.citation_journal,
+                    "year": citation.citation_year,
+                    "oa_status": citation.oa_status,
+                    "pdf_url": citation.pdf_url,
+                }
+
+            papers[doi].append(citation.item_id)
+
+    click.echo(f"Found {len(papers)} papers citing {len(citations)} datasets")
+    click.echo(f"Output directory: {output_dir}")
+
+    # Check git-annex
+    if git_annex and not dry_run:
+        if not GitAnnexHelper.is_git_annex_repo():
+            click.echo(
+                "Warning: git-annex requested but not initialized in this repo",
+                err=True,
+            )
+            git_annex = False
+
+    # Extract contexts
+    extractor = ContextExtractor()
+
+    extracted_count = 0
+    skipped_count = 0
+    error_count = 0
+
+    for doi, dataset_ids in papers.items():
+        # Normalize DOI to path (preserve slashes)
+        doi_path = output_dir / doi
+        json_path = doi_path / "extracted_citations.json"
+
+        # Check if already extracted
+        if json_path.exists() and not overwrite:
+            click.echo(f"⊘ {doi} (already extracted)")
+            skipped_count += 1
+            continue
+
+        # Find PDF or HTML
+        pdf_path = doi_path / "article.pdf"
+        html_path = doi_path / "article.html"
+
+        if not pdf_path.exists() and not html_path.exists():
+            click.echo(f"✗ {doi} (no PDF/HTML found)")
+            error_count += 1
+            continue
+
+        if dry_run:
+            click.echo(f"[DRY RUN] Would extract: {doi}")
+            click.echo(f"  Datasets: {', '.join(dataset_ids)}")
+            click.echo(f"  Source: {'PDF' if pdf_path.exists() else 'HTML'}")
+            extracted_count += 1
+            continue
+
+        # Extract
+        try:
+            if pdf_path.exists():
+                extracted = extractor.extract_from_pdf(pdf_path, dataset_ids)
+            else:
+                extracted = extractor.extract_from_html(html_path, dataset_ids)
+
+            # Add metadata from citation record
+            metadata = paper_metadata[doi]
+            extracted["paper_doi"] = doi
+            extracted["paper_title"] = metadata["title"]
+            extracted["paper_journal"] = metadata["journal"]
+            extracted["paper_year"] = metadata["year"]
+            extracted["oa_status"] = metadata["oa_status"]
+
+            # Save
+            extractor.save_extracted_citations(extracted, json_path)
+
+            # Git-annex
+            if git_annex:
+                oa_status = metadata["oa_status"] or "closed"
+                GitAnnexHelper.add_with_metadata(
+                    json_path,
+                    oa_status=oa_status,
+                    url=metadata["pdf_url"],
+                )
+
+            # Report
+            mention_count = sum(len(c["dataset_mentions"]) for c in extracted["citations"])
+            click.echo(
+                f"✓ {doi} ({len(extracted['citations'])} datasets, " f"{mention_count} mentions)"
+            )
+            extracted_count += 1
+
+        except Exception as e:
+            click.echo(f"✗ {doi}: {e}", err=True)
+            error_count += 1
+
+    # Summary
+    click.echo("\n" + "=" * 60)
+    click.echo(f"Extracted: {extracted_count}")
+    click.echo(f"Skipped: {skipped_count}")
+    click.echo(f"Errors: {error_count}")
+
+    if git_annex and extracted_count > 0 and not dry_run:
+        click.echo(f"\n✓ Added {extracted_count} files to git-annex with metadata")
+
+
 if __name__ == "__main__":
     main()
