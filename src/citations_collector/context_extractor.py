@@ -35,6 +35,48 @@ class ContextExtractor:
             ],
         }
 
+    def extract_full_text_from_pdf(
+        self,
+        pdf_path: Path,
+        max_chars: int = 50000,
+    ) -> str:
+        """Extract full text from PDF (up to max_chars).
+
+        Args:
+            pdf_path: Path to PDF file
+            max_chars: Maximum characters to extract (default: 50000)
+
+        Returns:
+            Full text string (or first max_chars)
+        """
+        try:
+            import pdfplumber
+        except ImportError as e:
+            raise ImportError(
+                "pdfplumber required for PDF extraction. "
+                "Install with: pip install pdfplumber"
+            ) from e
+
+        logger.info(f"Extracting full text from PDF: {pdf_path}")
+
+        full_text_parts = []
+        total_chars = 0
+
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text() or ""
+                if total_chars + len(text) > max_chars:
+                    # Truncate to max_chars
+                    remaining = max_chars - total_chars
+                    full_text_parts.append(text[:remaining])
+                    break
+                full_text_parts.append(text)
+                total_chars += len(text)
+
+        full_text = "\n\n".join(full_text_parts)
+        logger.debug(f"Extracted {len(full_text)} chars from {pdf_path}")
+        return full_text
+
     def extract_from_pdf(
         self,
         pdf_path: Path,
@@ -108,6 +150,48 @@ class ContextExtractor:
                 "extraction_method": "pdfplumber",
                 "citations": list(citations_by_dataset.values()),
             }
+
+    def extract_full_text_from_html(
+        self,
+        html_path: Path,
+        max_chars: int = 50000,
+    ) -> str:
+        """Extract full text from HTML (up to max_chars).
+
+        Args:
+            html_path: Path to HTML file
+            max_chars: Maximum characters to extract (default: 50000)
+
+        Returns:
+            Full text string (or first max_chars)
+        """
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError as e:
+            raise ImportError(
+                "beautifulsoup4 required for HTML extraction. "
+                "Install with: pip install beautifulsoup4"
+            ) from e
+
+        logger.info(f"Extracting full text from HTML: {html_path}")
+
+        with open(html_path, encoding="utf-8", errors="ignore") as f:
+            soup = BeautifulSoup(f.read(), "html.parser")
+
+        # Remove script/style elements
+        for script in soup(["script", "style"]):
+            script.decompose()
+
+        # Get all text
+        full_text = soup.get_text(separator="\n", strip=True)
+
+        # Truncate if needed
+        if len(full_text) > max_chars:
+            full_text = full_text[:max_chars]
+            logger.debug(f"Truncated HTML text to {max_chars} chars")
+
+        logger.debug(f"Extracted {len(full_text)} chars from {html_path}")
+        return full_text
 
     def extract_from_html(
         self,

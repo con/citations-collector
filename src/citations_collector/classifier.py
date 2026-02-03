@@ -101,6 +101,57 @@ class CitationClassifier:
 
         return result
 
+    def classify_from_full_text(
+        self,
+        pdf_or_html_path: Path,
+        dataset_ids: list[str],
+        paper_metadata: dict[str, Any],
+    ) -> list[tuple[str, ClassificationResult]]:
+        """Classify citations using full paper text.
+
+        Args:
+            pdf_or_html_path: Path to PDF or HTML file
+            dataset_ids: List of dataset IDs to classify
+            paper_metadata: Paper metadata dict
+
+        Returns:
+            List of (dataset_id, ClassificationResult) tuples
+        """
+        from citations_collector.context_extractor import ContextExtractor
+
+        extractor = ContextExtractor()
+
+        # Extract full text
+        if pdf_or_html_path.suffix == ".pdf":
+            full_text = extractor.extract_full_text_from_pdf(
+                pdf_or_html_path, max_chars=50000
+            )
+        elif pdf_or_html_path.suffix == ".html":
+            full_text = extractor.extract_full_text_from_html(
+                pdf_or_html_path, max_chars=50000
+            )
+        else:
+            logger.error(f"Unsupported file type: {pdf_or_html_path.suffix}")
+            return []
+
+        logger.info(
+            f"Classifying with full text ({len(full_text)} chars) "
+            f"for {len(dataset_ids)} datasets"
+        )
+
+        results = []
+
+        # Classify each dataset using the full paper text as context
+        for dataset_id in dataset_ids:
+            result = self.classify_citation(
+                contexts=[full_text],  # Use full text as single context
+                paper_metadata=paper_metadata,
+                dataset_id=dataset_id,
+            )
+            results.append((dataset_id, result))
+
+        return results
+
     def classify_from_extracted_file(
         self,
         extracted_file: Path,

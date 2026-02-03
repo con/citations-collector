@@ -739,6 +739,11 @@ def extract_contexts(
     is_flag=True,
     help="Show what would be classified without updating TSV",
 )
+@click.option(
+    "--full-text",
+    is_flag=True,
+    help="Use full paper text instead of extracted contexts (experimental)",
+)
 def classify(
     collection: Path,
     backend: str,
@@ -747,6 +752,7 @@ def classify(
     review: bool,
     output_dir: Path | None,
     dry_run: bool,
+    full_text: bool,
 ) -> None:
     """Classify citation relationships using LLM.
 
@@ -811,26 +817,50 @@ def classify(
         raise click.Abort()
 
     click.echo(f"Confidence threshold: {confidence_threshold:.2f}")
-    click.echo(f"Output directory: {output_dir}\n")
+    click.echo(f"Output directory: {output_dir}")
+    if full_text:
+        click.echo("Mode: Full text classification (experimental)\n")
+    else:
+        click.echo("Mode: Extracted contexts\n")
 
-    # Find papers with extracted contexts
+    # Find papers to classify
     papers_to_classify = []
-    for doi in {c.citation_doi for c in citations if c.citation_doi}:
-        doi_path = output_dir / doi
-        json_path = doi_path / "extracted_citations.json"
+    if full_text:
+        # Full text mode: find PDF/HTML files
+        for doi in {c.citation_doi for c in citations if c.citation_doi}:
+            doi_path = output_dir / doi
+            pdf_path = doi_path / "article.pdf"
+            html_path = doi_path / "article.html"
 
-        if json_path.exists():
-            papers_to_classify.append((doi, json_path))
+            if pdf_path.exists():
+                papers_to_classify.append((doi, pdf_path, "pdf"))
+            elif html_path.exists():
+                papers_to_classify.append((doi, html_path, "html"))
+    else:
+        # Extracted contexts mode: find extracted_citations.json
+        for doi in {c.citation_doi for c in citations if c.citation_doi}:
+            doi_path = output_dir / doi
+            json_path = doi_path / "extracted_citations.json"
+
+            if json_path.exists():
+                papers_to_classify.append((doi, json_path, "json"))
 
     if not papers_to_classify:
-        click.echo(
-            "No extracted_citations.json files found. "
-            "Run 'citations-collector extract-contexts' first.",
-            err=True,
-        )
+        if full_text:
+            click.echo(
+                "No PDF/HTML files found. "
+                "Run 'citations-collector fetch-pdfs' first.",
+                err=True,
+            )
+        else:
+            click.echo(
+                "No extracted_citations.json files found. "
+                "Run 'citations-collector extract-contexts' first.",
+                err=True,
+            )
         raise click.Abort()
 
-    click.echo(f"Found {len(papers_to_classify)} papers with extracted contexts\n")
+    click.echo(f"Found {len(papers_to_classify)} papers to classify\n")
 
     # Classify
     classified_count = 0
@@ -838,11 +868,46 @@ def classify(
     error_count = 0
     updates = []  # (doi, item_id, relationship, confidence, reasoning)
 
-    for doi, json_path in papers_to_classify:
+    for item in papers_to_classify:
+        if full_text:
+            doi, file_path, file_type = item
+        else:
+            doi, file_path, _ = item
+
         click.echo(f"Classifying: {doi}")
 
         try:
-            results = classifier.classify_from_extracted_file(json_path)
+            if full_text:
+                # Full text mode: get dataset IDs for this DOI
+                datasets_for_doi = [
+                    c.item_id
+                    for c in citations
+                    if c.citation_doi == doi
+                ]
+
+                # Get paper metadata
+                paper_metadata = {
+                    "title": next(
+                        (c.citation_title for c in citations if c.citation_doi == doi),
+                        "Unknown",
+                    ),
+                    "journal": next(
+                        (c.citation_journal for c in citations if c.citation_doi == doi),
+                        None,
+                    ),
+                    "year": next(
+                        (c.citation_year for c in citations if c.citation_doi == doi),
+                        None,
+                    ),
+                    "doi": doi,
+                }
+
+                results = classifier.classify_from_full_text(
+                    file_path, datasets_for_doi, paper_metadata
+                )
+            else:
+                # Extracted contexts mode
+                results = classifier.classify_from_extracted_file(file_path)
 
             for dataset_id, result in results:
                 # Look up citation record
