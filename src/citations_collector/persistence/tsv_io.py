@@ -122,8 +122,8 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
         writer.writeheader()
 
         for citation in citations:
-            # Convert to dict
-            data = citation.model_dump(exclude_none=False, mode="python")
+            # Convert to dict (use mode="json" to properly serialize enums)
+            data = citation.model_dump(exclude_none=False, mode="json")
 
             # Serialize citation_sources list to comma-separated string
             if "citation_sources" in data:
@@ -136,9 +136,9 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
             # Serialize citation_relationships list to comma-separated string
             if "citation_relationships" in data:
                 if data["citation_relationships"]:
-                    # Convert enum values to strings
+                    # mode="json" already converted enums to strings
                     data["citation_relationships"] = ", ".join(
-                        str(r) for r in data["citation_relationships"]
+                        data["citation_relationships"]
                     )
                 else:
                     # Empty list -> empty string (not "[]")
