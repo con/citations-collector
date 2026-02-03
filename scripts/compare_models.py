@@ -161,10 +161,34 @@ def run_comparison(collection_path: Path, output_dir: Path):
     print()
 
     # Dartmouth models to test
-    dartmouth_models = [
-        "claude-sonnet-4-5",
-        # Add others if user has access
+    # Free (local at Dartmouth) - good for testing
+    dartmouth_free = [
+        "openai.gpt-oss-120b",  # GPT-OSS 120b (Reasoning)
+        "google.gemma-3-27b-it",  # Gemma 3 27b
+        "meta.llama-3.2-11b-vision-instruct",  # Llama 3.2 11b
     ]
+
+    # Budget ($) - fast and cheap
+    dartmouth_budget = [
+        "anthropic.claude-haiku-4-5-20251001",  # Claude Haiku 4.5
+        "openai.gpt-4.1-mini-2025-04-14",  # GPT 4.1 mini
+        "vertex_ai.gemini-2.0-flash-001",  # Gemini 2.0 Flash
+    ]
+
+    # Premium ($$$) - best quality
+    dartmouth_premium = [
+        "anthropic.claude-sonnet-4-5-20250929",  # Claude Sonnet 4.5 (tested)
+        "openai_responses.gpt-5-2025-08-07",  # GPT-5
+        "vertex_ai.gemini-2.5-pro",  # Gemini 2.5 Pro
+    ]
+
+    # Select models based on priority
+    # Start with free + 1-2 budget + 1 premium for comprehensive comparison
+    dartmouth_models = (
+        dartmouth_free[:2] +  # 2 free models
+        dartmouth_budget[:2] +  # 2 budget models
+        dartmouth_premium[:1]  # 1 premium model
+    )
 
     # Check if Dartmouth is available
     dartmouth_available = False
