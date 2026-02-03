@@ -932,36 +932,50 @@ def classify(
         # Update citation records
         from citations_collector.models.generated import CitationRelationship
 
+        updated_citations = []
         for doi, item_id, relationship, confidence, reasoning in updates:
             citation = citation_lookup.get((doi, item_id))
             if citation:
                 # Update relationship (use enum value)
                 try:
                     rel_enum = CitationRelationship(relationship)
-                    citation.citation_relationship = rel_enum
-                    # Also update the list field
-                    if not citation.citation_relationships:
-                        citation.citation_relationships = []
-                    if rel_enum not in citation.citation_relationships:
-                        citation.citation_relationships = [rel_enum]
-                except ValueError:
+
+                    # Build comment
+                    comment_parts = []
+                    if citation.citation_comment:
+                        comment_parts.append(citation.citation_comment)
+                    comment_parts.append(
+                        f"[LLM classified: confidence={confidence:.2f}]"
+                    )
+                    if confidence < confidence_threshold:
+                        comment_parts.append(f"Reasoning: {reasoning[:200]}")
+                    new_comment = " ".join(comment_parts)
+
+                    # Update using model_copy to avoid Pydantic validation issues
+                    updated = citation.model_copy(
+                        update={
+                            "citation_relationship": rel_enum,
+                            "citation_relationships": [rel_enum],
+                            "citation_comment": new_comment,
+                        }
+                    )
+                    updated_citations.append((doi, item_id, updated))
+
+                except (ValueError, Exception) as e:
                     click.echo(
-                        f"Warning: Invalid relationship type '{relationship}' "
-                        f"for {item_id}, skipping",
+                        f"Warning: Failed to update relationship '{relationship}' "
+                        f"for {item_id}: {e}",
                         err=True,
                     )
                     continue
 
-                # Store confidence and reasoning in comment field
-                comment_parts = []
-                if citation.citation_comment:
-                    comment_parts.append(citation.citation_comment)
-                comment_parts.append(
-                    f"[LLM classified: confidence={confidence:.2f}]"
-                )
-                if confidence < confidence_threshold:
-                    comment_parts.append(f"Reasoning: {reasoning[:200]}")
-                citation.citation_comment = " ".join(comment_parts)
+        # Replace updated citations in the list
+        for doi, item_id, updated_citation in updated_citations:
+            citation = citation_lookup.get((doi, item_id))
+            if citation:
+                # Replace in citations list
+                idx = citations.index(citation)
+                citations[idx] = updated_citation
 
         # Save
         tsv_io.save_citations(citations, tsv_path)

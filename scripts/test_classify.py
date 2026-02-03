@@ -23,8 +23,8 @@ def test_classify_real_extracts():
         print("  Run extract-contexts in dandi-bib first")
         return False
 
-    # Find extracted files
-    extracted_files = list(dandi_bib_path.glob("*/extracted_citations.json"))
+    # Find extracted files (recursively)
+    extracted_files = list(dandi_bib_path.glob("**/extracted_citations.json"))
 
     if not extracted_files:
         print(f"⊘ No extracted_citations.json files found in {dandi_bib_path}")
