@@ -32,6 +32,15 @@ TSV_COLUMNS = [
     "citation_comment",
     "curated_by",
     "curated_date",
+    "classification_method",
+    "classification_model",
+    "classification_confidence",
+    "classification_date",
+    "classification_mode",
+    "classification_reasoning",
+    "classification_reviewed",
+    "classification_reviewed_by",
+    "classification_reviewed_date",
     "oa_status",
     "pdf_url",
     "pdf_path",
@@ -64,6 +73,19 @@ def load_citations(path: Path) -> list[CitationRecord]:
             if cleaned.get("citation_year"):
                 with suppress(ValueError):
                     cleaned["citation_year"] = int(cleaned["citation_year"])  # type: ignore[arg-type]
+
+            # Convert classification_confidence to float if present
+            if cleaned.get("classification_confidence"):
+                with suppress(ValueError):
+                    cleaned["classification_confidence"] = float(
+                        cleaned["classification_confidence"]
+                    )  # type: ignore[arg-type]
+
+            # Convert classification_reviewed to bool if present
+            if cleaned.get("classification_reviewed"):
+                # Accept: true/True/1/yes, false/False/0/no/empty
+                val = str(cleaned["classification_reviewed"]).lower()
+                cleaned["classification_reviewed"] = val in ("true", "1", "yes")
 
             # Parse citation_sources from TSV (comma-separated)
             # Support both old "citation_source" and new "citation_sources" columns
@@ -137,9 +159,7 @@ def save_citations(citations: list[CitationRecord], path: Path) -> None:
             if "citation_relationships" in data:
                 if data["citation_relationships"]:
                     # mode="json" already converted enums to strings
-                    data["citation_relationships"] = ", ".join(
-                        data["citation_relationships"]
-                    )
+                    data["citation_relationships"] = ", ".join(data["citation_relationships"])
                 else:
                     # Empty list -> empty string (not "[]")
                     data["citation_relationships"] = ""

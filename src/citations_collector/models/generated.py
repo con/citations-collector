@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 import sys
 from datetime import (
@@ -26,8 +25,7 @@ from pydantic import (
     SerializationInfo,
     SerializerFunctionWrapHandler,
     field_validator,
-    model_serializer,
-    model_validator,
+    model_serializer
 )
 
 
@@ -303,6 +301,28 @@ class CitationStatus(str, Enum):
     """
 
 
+class ClassificationMethod(str, Enum):
+    """
+    How the citation relationship was determined.
+    """
+    manual = "manual"
+    """
+    Manually classified by a human curator.
+    """
+    llm = "llm"
+    """
+    Classified by a Large Language Model.
+    """
+    rule = "rule"
+    """
+    Classified by an automated rule or heuristic.
+    """
+    imported = "imported"
+    """
+    Imported from external source with existing classification.
+    """
+
+
 
 class ItemRef(ConfiguredBaseModel):
     """
@@ -400,6 +420,17 @@ class CitationRecord(ConfiguredBaseModel):
     citation_comment: Optional[str] = Field(default=None, description="""Curator notes about this citation.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     curated_by: Optional[str] = Field(default=None, description="""Who made the curation decision.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     curated_date: Optional[date] = Field(default=None, description="""When the curation decision was made (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_method: Optional[ClassificationMethod] = Field(default=None, description="""How the citation_relationship was determined. Use \"manual\" for human curation, \"llm\" for LLM classification.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_model: Optional[str] = Field(default=None, description="""LLM model identifier if classification_method is \"llm\". Examples: \"google.gemma-3-27b-it\", \"anthropic.claude-sonnet-4-5\", \"qwen2:7b\" (Ollama).""", json_schema_extra = { "linkml_meta": {'comments': ['Store full model identifier as returned by backend.',
+                      'Enables tracking which models performed best.'],
+         'domain_of': ['CitationRecord']} })
+    classification_confidence: Optional[float] = Field(default=None, description="""Confidence score from LLM classification (0.0-1.0). Higher values indicate higher model confidence.""", ge=0.0, le=1.0, json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_date: Optional[date] = Field(default=None, description="""When the classification was performed (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_mode: Optional[str] = Field(default=None, description="""Classification mode used: \"short_context\" (extracted paragraphs) or \"full_text\" (up to 50K chars). Relevant for LLM classification.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_reasoning: Optional[str] = Field(default=None, description="""Brief reasoning from LLM for the classification decision. Truncated to ~200 chars for storage efficiency.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_reviewed: Optional[bool] = Field(default=False, description="""Whether a human has reviewed and approved the LLM classification. Use for tracking which auto-classifications need manual review.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'], 'ifabsent': 'false'} })
+    classification_reviewed_by: Optional[str] = Field(default=None, description="""Who reviewed the LLM classification.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_reviewed_date: Optional[date] = Field(default=None, description="""When the LLM classification was reviewed (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     oa_status: Optional[str] = Field(default=None, description="""Open access status from Unpaywall: gold, green, bronze, hybrid, or closed.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     pdf_url: Optional[str] = Field(default=None, description="""Best open access PDF URL from Unpaywall.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     pdf_path: Optional[str] = Field(default=None, description="""Relative path to locally stored PDF file.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
@@ -430,74 +461,18 @@ class CitationRecord(ConfiguredBaseModel):
             raise ValueError(err_msg)
         return v
 
-    @model_validator(mode='after')
-    def validate_sources_dates_coherence(self):
-        """Validate that citation_sources and discovered_dates are coherent.
-
-        NOTE: This validator is manually added and must be preserved when
-        regenerating models from schema. LinkML does not yet support
-        cross-field validation rules.
-
-        Validation rules:
-        - If discovered_dates is None/empty: no validation (backward compat)
-        - If discovered_dates is present: must be valid JSON dict matching citation_sources
-        """
-        # Only validate if discovered_dates is actually populated
-        if not self.discovered_dates:
-            return self
-
-        # Parse discovered_dates JSON
-        try:
-            dates_dict = json.loads(self.discovered_dates)
-            if not isinstance(dates_dict, dict):
-                raise ValueError(
-                    f"discovered_dates must be a JSON object, got: {type(dates_dict).__name__}"
-                )
-        except json.JSONDecodeError as e:
-            raise ValueError(f"Invalid JSON in discovered_dates: {e}")
-
-        # Enforce coherence between citation_sources and discovered_dates keys
-        sources_set = set(self.citation_sources or [])
-        dates_keys_set = set(dates_dict.keys())
-
-        missing_in_dates = sources_set - dates_keys_set
-        missing_in_sources = dates_keys_set - sources_set
-
-        errors = []
-        if missing_in_dates:
-            errors.append(f"Sources in citation_sources missing from discovered_dates: {sorted(missing_in_dates)}")
-        if missing_in_sources:
-            errors.append(f"Keys in discovered_dates missing from citation_sources: {sorted(missing_in_sources)}")
-
-        if errors:
-            raise ValueError("citation_sources and discovered_dates must be coherent. " + "; ".join(errors))
-
-        return self
-
-    @model_validator(mode='after')
-    def validate_relationships_coherence(self):
-        """Validate that citation_relationship and citation_relationships are coherent.
-
-        NOTE: This validator is manually added and must be preserved when
-        regenerating models from schema. LinkML does not yet support
-        cross-field validation rules.
-
-        Validation rules:
-        - citation_relationship (singular) must match first element of citation_relationships
-        - If citation_relationships is empty, create from citation_relationship
-        """
-        # Ensure citation_relationships is populated
-        if not self.citation_relationships:
-            # Auto-populate from singular field for backward compat
-            self.citation_relationships = [self.citation_relationship]
-        elif self.citation_relationship != self.citation_relationships[0]:
-            # Enforce coherence: singular must match first element
-            raise ValueError(
-                f"citation_relationship ({self.citation_relationship}) must match "
-                f"first element of citation_relationships ({self.citation_relationships[0]})"
-            )
-
-        return self
+    @field_validator('classification_mode')
+    def pattern_classification_mode(cls, v):
+        pattern=re.compile(r"^(short_context|full_text)$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid classification_mode format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid classification_mode format: {v}"
+            raise ValueError(err_msg)
+        return v
 
 
 class SourceConfig(ConfiguredBaseModel):
