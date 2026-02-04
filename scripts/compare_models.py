@@ -6,6 +6,7 @@ and full text, stores results, and generates comparison report.
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -53,16 +54,10 @@ def classify_with_model(
         if mode == "full":
             doi, file_path, file_type = item
             # Get datasets for this DOI
-            datasets_for_doi = [
-                dataset_id
-                for (d, dataset_id) in citation_lookup.keys()
-                if d == doi
-            ]
+            datasets_for_doi = [dataset_id for (d, dataset_id) in citation_lookup if d == doi]
 
             # Get paper metadata
-            citation = next(
-                (c for c in citation_lookup.values() if c.citation_doi == doi), None
-            )
+            citation = next((c for c in citation_lookup.values() if c.citation_doi == doi), None)
             if not citation:
                 continue
 
@@ -119,9 +114,7 @@ def run_comparison(collection_path: Path, output_dir: Path):
     pdfs_dir = Path(coll.pdfs.output_dir) if coll.pdfs else Path("pdfs")
 
     # Build citation lookup
-    citation_lookup = {
-        (c.citation_doi, c.item_id): c for c in citations if c.citation_doi
-    }
+    citation_lookup = {(c.citation_doi, c.item_id): c for c in citations if c.citation_doi}
 
     print(f"Loaded {len(citations)} citations")
     print()
@@ -185,27 +178,39 @@ def run_comparison(collection_path: Path, output_dir: Path):
     # Select models based on priority
     # Start with free + 1-2 budget + 1 premium for comprehensive comparison
     dartmouth_models = (
-        dartmouth_free[:2] +  # 2 free models
-        dartmouth_budget[:2] +  # 2 budget models
-        dartmouth_premium[:1]  # 1 premium model
+        dartmouth_free[:2]  # 2 free models
+        + dartmouth_budget[:2]  # 2 budget models
+        + dartmouth_premium[:1]  # 1 premium model
     )
 
     # Check if Dartmouth is available
+    # Dartmouth uses OPENAI_API_KEY for authentication
     dartmouth_available = False
-    try:
-        secrets_path = Path.home() / "proj/dandi/citations-collector/.git/secrets"
-        if secrets_path.exists():
-            with open(secrets_path) as f:
-                for line in f:
-                    if "DARTMOUTH_API_TOKEN" in line:
-                        dartmouth_available = True
-                        break
-    except Exception:
-        pass
+
+    # Check environment variable first
+    if os.getenv("OPENAI_API_KEY"):
+        dartmouth_available = True
+    else:
+        # Try to load from secrets file
+        try:
+            secrets_path = Path.home() / "proj/dandi/citations-collector/.git/secrets"
+            if secrets_path.exists():
+                with open(secrets_path) as f:
+                    for line in f:
+                        if "OPENAI_API_KEY" in line and "=" in line:
+                            # Set environment variable for backends
+                            key, value = line.split("=", 1)
+                            os.environ["OPENAI_API_KEY"] = value.strip()
+                            dartmouth_available = True
+                            break
+        except Exception as e:
+            print(f"Warning: Could not load secrets: {e}")
 
     if not dartmouth_available:
-        print("Dartmouth API not configured, skipping")
+        print("Dartmouth API not configured (no OPENAI_API_KEY), skipping")
         dartmouth_models = []
+    else:
+        print(f"Dartmouth API configured, testing {len(dartmouth_models)} models")
 
     # Storage for all results
     all_results = {}
@@ -288,12 +293,8 @@ def run_comparison(collection_path: Path, output_dir: Path):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Compare LLM models for citation classification"
-    )
-    parser.add_argument(
-        "collection", type=Path, help="Path to collection YAML file"
-    )
+    parser = argparse.ArgumentParser(description="Compare LLM models for citation classification")
+    parser.add_argument("collection", type=Path, help="Path to collection YAML file")
     parser.add_argument(
         "--output-dir",
         type=Path,
