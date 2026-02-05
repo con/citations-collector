@@ -8,48 +8,44 @@ This PR adds a complete LLM-based citation classification system with multi-mode
 - **classify** command for automated citation relationship classification
 - Support for 4 LLM backends: Ollama, Dartmouth, OpenRouter, OpenAI
 - Interactive review mode for low-confidence classifications
-- Short-context mode (extracted paragraphs) and full-text mode for comparison
+- Short-context mode (extracted paragraphs) and full-text mode
 
-### 2. Multi-Model Comparison Framework
-- Store results from multiple models per paper in `pdfs/{doi}/classifications.json`
+### 2. Classification Metadata Schema
+- 4 metadata fields: `classification_method`, `classification_model`, `classification_confidence`, `classification_reviewed`
+- Per-paper storage in `pdfs/{doi}/classifications.json` with full provenance (reasoning, timestamp, mode, backend)
+- Enables multi-model comparison and ensemble voting
+
+### 3. Context Extraction
+- **extract-contexts** command extracts citation contexts from PDFs/HTMLs
+- Expanded context window (±400 chars, max 1000) with paragraph boundary detection
+- Stores extracted contexts in `pdfs/{doi}/extracted_citations.json`
+
+### 4. Multi-Model Comparison
+- Store results from multiple models per paper
 - Compare relationship types, confidence scores, and agreement rates
-- Systematic model evaluation scripts with analysis and reporting
-- Documentation of 31+ available models across Dartmouth tiers (Free to Premium)
-
-### 3. Improved Context Extraction
-- Expanded context window from ±250 to ±400 chars (max 1000 chars)
-- Better paragraph boundary detection for natural context
-- Captures actual usage descriptions instead of just bibliography entries
-
-### 4. Classification Metadata Schema
-- 4 essential fields in main table: `classification_method`, `classification_model`, `classification_confidence`, `classification_reviewed`
-- Full provenance per paper: reasoning, timestamp, mode, backend
-- Per-paper storage enables ensemble voting and model comparison
-- Git commits track dates and authors automatically
+- Scripts for systematic model evaluation and analysis
 
 ### 5. Git-annex Integration
 - Automatic detection and management of annexed PDFs
-- Prevents "file not found" errors when PDFs are in git-annex
+- Prevents "file not found" errors when working with git-annex repositories
 
 ## Statistics
 
 **Code:**
-- 10,449+ lines added across 40 new/modified files
-- New modules: `classifier.py`, `context_extractor.py`, `classifications_storage.py`, `git_annex.py`, `llm/*`
+- Core library modules: `classifier.py`, `context_extractor.py`, `classifications_storage.py`, `git_annex.py`, `llm/*` backends
 - Schema updates: Added `ClassificationMethod` enum and 4 metadata fields to `CitationRecord`
+- CLI commands: `extract-contexts`, `classify` with interactive review mode
 
 **Documentation:**
-- 8 user-facing guides in `docs/`: CLASSIFICATION-WORKFLOW, CLASSIFICATION-METADATA, AVAILABLE-MODELS, MODEL-COMPARISON, SETUP-LLM, CONTEXT-EXTRACTION, DANDI-BIB-SETUP, AUTOMATION
-- docs/README.md - Documentation index with quick start guide
-- Removed 6 outdated planning/status docs from .specify/specs/ (1,856 lines)
-- Kept 2 historical planning docs for reference (llm-integration-plan, reclassification-mvp)
+- 7 user-facing guides in `docs/`: CLASSIFICATION-WORKFLOW, CLASSIFICATION-METADATA, AVAILABLE-MODELS, MODEL-COMPARISON, SETUP-LLM, CONTEXT-EXTRACTION, README
+- Points to [dandi-bib](https://github.com/dandi/dandi-bib) for operational deployment example
 
 **Testing:**
-- 8 test/automation scripts for classification, context extraction, backend testing, and model comparison
+- 6 example/test scripts: backend connectivity, context extraction, classification, model comparison
 
 ## Real-World Testing
 
-Tested on **dandi-bib** with 94 citations:
+Tested on [dandi-bib](https://github.com/dandi/dandi-bib) (DANDI Archive citations):
 - **47 citations classified** with actual LLM (google.gemma-3-27b-it via Dartmouth)
 - Relationship types: `IsDocumentedBy` (0.95), `Uses` (0.80-0.90), `CitesAsDataSource` (0.75), `CitesForInformation` (0.75)
 - **Zero low-confidence results** (all ≥ 0.70 threshold)
@@ -66,6 +62,8 @@ Example real classification:
   "timestamp": "2026-02-05T11:14:14.236553"
 }
 ```
+
+See [dandi-bib repository](https://github.com/dandi/dandi-bib) for operational workflows and automation setup.
 
 ## Usage
 
@@ -101,21 +99,16 @@ python scripts/analyze_model_comparison.py
 - Complete audit trail co-located with paper data
 - Flexible: add new models without losing old results
 
-## Commits (13)
+## Key Commits
 
 - dbfaa2b Improve context extraction: expand window to capture full paragraphs
-- a85bde3 Add classify command for LLM-based citation relationship classification
-- 44bf9c7 Add test script for classify command on real dandi-bib extracts
-- 67056e9 Fix classify command: use model_copy for atomic Pydantic updates
-- b3eb6e8 Add --full-text mode to classify command for comparison
-- c72213c Fix TSV serialization: use mode='json' for proper enum serialization
+- a85bde3 Add classify command for LLM-based classification
 - df29adc Add systematic LLM model comparison framework
-- 8f55835 Add comprehensive model listing and update comparison script
-- 1898052 Move import os to top of compare_models.py
 - 1e79859 Add LLM classification metadata to schema
 - 25d73e3 Simplify classification metadata to 4 fields + per-paper storage
 - 511fceb Add classification workflow with per-paper storage
-- 624b2a3 Clean up documentation: remove outdated planning/status docs
+- 624b2a3 Clean up documentation: remove outdated docs
+- (current) Remove dandi-bib specific files - operational setup belongs in dandi-bib repo
 
 ## Ready for Release
 
