@@ -313,14 +313,6 @@ class ClassificationMethod(str, Enum):
     """
     Classified by a Large Language Model.
     """
-    rule = "rule"
-    """
-    Classified by an automated rule or heuristic.
-    """
-    imported = "imported"
-    """
-    Imported from external source with existing classification.
-    """
 
 
 
@@ -420,17 +412,14 @@ class CitationRecord(ConfiguredBaseModel):
     citation_comment: Optional[str] = Field(default=None, description="""Curator notes about this citation.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     curated_by: Optional[str] = Field(default=None, description="""Who made the curation decision.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     curated_date: Optional[date] = Field(default=None, description="""When the curation decision was made (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_method: Optional[ClassificationMethod] = Field(default=None, description="""How the citation_relationship was determined. Use \"manual\" for human curation, \"llm\" for LLM classification.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_model: Optional[str] = Field(default=None, description="""LLM model identifier if classification_method is \"llm\". Examples: \"google.gemma-3-27b-it\", \"anthropic.claude-sonnet-4-5\", \"qwen2:7b\" (Ollama).""", json_schema_extra = { "linkml_meta": {'comments': ['Store full model identifier as returned by backend.',
-                      'Enables tracking which models performed best.'],
+    classification_method: Optional[ClassificationMethod] = Field(default=None, description="""How the citation_relationship was determined. \"manual\" for human curation, \"llm\" for LLM classification. Empty/null indicates unspecified (treat as manual).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_model: Optional[str] = Field(default=None, description="""LLM model identifier if classification_method is \"llm\". Empty for manual classifications. Examples: \"google.gemma-3-27b-it\", \"anthropic.claude-sonnet-4-5\", \"qwen2:7b\" (Ollama).""", json_schema_extra = { "linkml_meta": {'comments': ['Full classification details stored in '
+                      'pdfs/{doi}/classifications.json',
+                      'This field enables quick filtering without joining to external '
+                      'file.'],
          'domain_of': ['CitationRecord']} })
-    classification_confidence: Optional[float] = Field(default=None, description="""Confidence score from LLM classification (0.0-1.0). Higher values indicate higher model confidence.""", ge=0.0, le=1.0, json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_date: Optional[date] = Field(default=None, description="""When the classification was performed (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_mode: Optional[str] = Field(default=None, description="""Classification mode used: \"short_context\" (extracted paragraphs) or \"full_text\" (up to 50K chars). Relevant for LLM classification.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_reasoning: Optional[str] = Field(default=None, description="""Brief reasoning from LLM for the classification decision. Truncated to ~200 chars for storage efficiency.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_reviewed: Optional[bool] = Field(default=False, description="""Whether a human has reviewed and approved the LLM classification. Use for tracking which auto-classifications need manual review.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'], 'ifabsent': 'false'} })
-    classification_reviewed_by: Optional[str] = Field(default=None, description="""Who reviewed the LLM classification.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
-    classification_reviewed_date: Optional[date] = Field(default=None, description="""When the LLM classification was reviewed (ISO 8601).""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_confidence: Optional[float] = Field(default=None, description="""Confidence score from LLM classification (0.0-1.0). Empty for manual classifications.""", ge=0.0, le=1.0, json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
+    classification_reviewed: Optional[bool] = Field(default=False, description="""Has a human reviewed and approved this classification? Use for tracking which LLM classifications need manual verification. Defaults to false for new LLM classifications.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord'], 'ifabsent': 'false'} })
     oa_status: Optional[str] = Field(default=None, description="""Open access status from Unpaywall: gold, green, bronze, hybrid, or closed.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     pdf_url: Optional[str] = Field(default=None, description="""Best open access PDF URL from Unpaywall.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
     pdf_path: Optional[str] = Field(default=None, description="""Relative path to locally stored PDF file.""", json_schema_extra = { "linkml_meta": {'domain_of': ['CitationRecord']} })
@@ -458,19 +447,6 @@ class CitationRecord(ConfiguredBaseModel):
                     raise ValueError(err_msg)
         elif isinstance(v, str) and not pattern.match(v):
             err_msg = f"Invalid citation_merged_into format: {v}"
-            raise ValueError(err_msg)
-        return v
-
-    @field_validator('classification_mode')
-    def pattern_classification_mode(cls, v):
-        pattern=re.compile(r"^(short_context|full_text)$")
-        if isinstance(v, list):
-            for element in v:
-                if isinstance(element, str) and not pattern.match(element):
-                    err_msg = f"Invalid classification_mode format: {element}"
-                    raise ValueError(err_msg)
-        elif isinstance(v, str) and not pattern.match(v):
-            err_msg = f"Invalid classification_mode format: {v}"
             raise ValueError(err_msg)
         return v
 

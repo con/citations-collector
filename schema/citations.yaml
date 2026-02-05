@@ -247,10 +247,6 @@ enums:
         description: Manually classified by a human curator.
       llm:
         description: Classified by a Large Language Model.
-      rule:
-        description: Classified by an automated rule or heuristic.
-      imported:
-        description: Imported from external source with existing classification.
 
 # =============================================================================
 # Classes
@@ -506,50 +502,36 @@ classes:
         description: When the curation decision was made (ISO 8601).
         range: date
 
-      # Classification metadata (LLM provenance)
+      # Classification metadata (minimal - full details in per-paper classifications.json)
       classification_method:
         description: >-
           How the citation_relationship was determined.
-          Use "manual" for human curation, "llm" for LLM classification.
+          "manual" for human curation, "llm" for LLM classification.
+          Empty/null indicates unspecified (treat as manual).
         range: ClassificationMethod
       classification_model:
         description: >-
           LLM model identifier if classification_method is "llm".
+          Empty for manual classifications.
           Examples: "google.gemma-3-27b-it", "anthropic.claude-sonnet-4-5",
           "qwen2:7b" (Ollama).
         comments:
-          - Store full model identifier as returned by backend.
-          - Enables tracking which models performed best.
+          - Full classification details stored in pdfs/{doi}/classifications.json
+          - This field enables quick filtering without joining to external file.
       classification_confidence:
         description: >-
           Confidence score from LLM classification (0.0-1.0).
-          Higher values indicate higher model confidence.
+          Empty for manual classifications.
         range: float
         minimum_value: 0.0
         maximum_value: 1.0
-      classification_date:
-        description: When the classification was performed (ISO 8601).
-        range: date
-      classification_mode:
-        description: >-
-          Classification mode used: "short_context" (extracted paragraphs)
-          or "full_text" (up to 50K chars). Relevant for LLM classification.
-        pattern: "^(short_context|full_text)$"
-      classification_reasoning:
-        description: >-
-          Brief reasoning from LLM for the classification decision.
-          Truncated to ~200 chars for storage efficiency.
       classification_reviewed:
         description: >-
-          Whether a human has reviewed and approved the LLM classification.
-          Use for tracking which auto-classifications need manual review.
+          Has a human reviewed and approved this classification?
+          Use for tracking which LLM classifications need manual verification.
+          Defaults to false for new LLM classifications.
         range: boolean
         ifabsent: "false"
-      classification_reviewed_by:
-        description: Who reviewed the LLM classification.
-      classification_reviewed_date:
-        description: When the LLM classification was reviewed (ISO 8601).
-        range: date
 
       # PDF/OA metadata
       oa_status:
