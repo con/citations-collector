@@ -6,7 +6,9 @@ Generated from LinkML schema at schema/citations.yaml.
 from __future__ import annotations
 
 from citations_collector.models.generated import (
-    CitationRecord,
+    CitationRecord as _CitationRecord,
+)
+from citations_collector.models.generated import (
     CitationRelationship,
     CitationSource,
     CitationStatus,
@@ -24,6 +26,10 @@ from citations_collector.models.generated import (
     SourceConfig,
     ZoteroConfig,
 )
+from citations_collector.models.validators import create_citation_record_with_validators
+
+# Apply custom validators to CitationRecord
+CitationRecord = create_citation_record_with_validators(_CitationRecord)
 
 __all__ = [
     "CitationRecord",
