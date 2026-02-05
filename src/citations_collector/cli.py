@@ -577,10 +577,9 @@ def extract_contexts(
 
     # Resolve git-annex setting
     if git_annex is None:
-        if coll.pdfs and coll.pdfs.git_annex is not None:
-            git_annex = coll.pdfs.git_annex
-        else:
-            git_annex = False
+        git_annex = (
+            coll.pdfs.git_annex if (coll.pdfs and coll.pdfs.git_annex is not None) else False
+        )
 
     # Load citations TSV
     tsv_path = Path(coll.output_tsv) if coll.output_tsv else Path("citations.tsv")
@@ -615,13 +614,12 @@ def extract_contexts(
     click.echo(f"Output directory: {output_dir}")
 
     # Check git-annex
-    if git_annex and not dry_run:
-        if not GitAnnexHelper.is_git_annex_repo():
-            click.echo(
-                "Warning: git-annex requested but not initialized in this repo",
-                err=True,
-            )
-            git_annex = False
+    if git_annex and not dry_run and not GitAnnexHelper.is_git_annex_repo():
+        click.echo(
+            "Warning: git-annex requested but not initialized in this repo",
+            err=True,
+        )
+        git_annex = False
 
     # Extract contexts
     extractor = ContextExtractor()
@@ -760,9 +758,15 @@ def classify(
     sends contexts to LLM for classification, and updates the citations
     TSV with relationship types and confidence scores.
 
+    Full classification details (reasoning, timestamp, mode) are saved to
+    pdfs/{doi}/classifications.json for each paper.
+
     Requires extracted_citations.json files created by extract-contexts.
     """
+
+    from citations_collector.classifications_storage import ClassificationsStorage
     from citations_collector.classifier import CitationClassifier
+    from citations_collector.models import ClassificationMethod
     from citations_collector.persistence import tsv_io
 
     click.echo(f"Loading collection from {collection}")
@@ -787,9 +791,7 @@ def classify(
     citations = tsv_io.load_citations(tsv_path)
 
     # Build citation lookup by (doi, item_id)
-    citation_lookup = {
-        (c.citation_doi, c.item_id): c for c in citations if c.citation_doi
-    }
+    citation_lookup = {(c.citation_doi, c.item_id): c for c in citations if c.citation_doi}
 
     click.echo(f"Loaded {len(citations)} citations from {tsv_path}")
     click.echo(f"Using {backend} backend for classification")
@@ -814,14 +816,27 @@ def classify(
                 "  - Check DARTMOUTH_API_TOKEN is set in environment or secrets",
                 err=True,
             )
-        raise click.Abort()
+        raise click.Abort() from e
 
     click.echo(f"Confidence threshold: {confidence_threshold:.2f}")
     click.echo(f"Output directory: {output_dir}")
+
+    # Determine mode and model identifier
+    classification_mode = "full_text" if full_text else "short_context"
+    # Get model identifier from classifier
+    if hasattr(classifier.backend, "model"):
+        model_id = classifier.backend.model
+    else:
+        model_id = model or "unknown"
+
+    click.echo(f"Model: {model_id}")
     if full_text:
         click.echo("Mode: Full text classification (experimental)\n")
     else:
         click.echo("Mode: Extracted contexts\n")
+
+    # Create classifications storage
+    storage = ClassificationsStorage(output_dir)
 
     # Find papers to classify
     papers_to_classify = []
@@ -848,8 +863,7 @@ def classify(
     if not papers_to_classify:
         if full_text:
             click.echo(
-                "No PDF/HTML files found. "
-                "Run 'citations-collector fetch-pdfs' first.",
+                "No PDF/HTML files found. " "Run 'citations-collector fetch-pdfs' first.",
                 err=True,
             )
         else:
@@ -866,7 +880,7 @@ def classify(
     classified_count = 0
     low_confidence_count = 0
     error_count = 0
-    updates = []  # (doi, item_id, relationship, confidence, reasoning)
+    updates = []  # (doi, item_id, item_flavor, result, was_reviewed)
 
     for item in papers_to_classify:
         if full_text:
@@ -879,11 +893,7 @@ def classify(
         try:
             if full_text:
                 # Full text mode: get dataset IDs for this DOI
-                datasets_for_doi = [
-                    c.item_id
-                    for c in citations
-                    if c.citation_doi == doi
-                ]
+                datasets_for_doi = [c.item_id for c in citations if c.citation_doi == doi]
 
                 # Get paper metadata
                 paper_metadata = {
@@ -921,15 +931,16 @@ def classify(
 
                 # Check if needs review
                 needs_review = classifier.should_review(result)
-                confidence_marker = (
-                    "⚠" if needs_review else "✓"
-                )
+                confidence_marker = "⚠" if needs_review else "✓"
 
                 click.echo(
                     f"  {confidence_marker} {dataset_id}: "
                     f"{result.relationship_type} "
                     f"(confidence: {result.confidence:.2f})"
                 )
+
+                # Track if this was reviewed/edited by human
+                was_reviewed = False
 
                 if needs_review:
                     low_confidence_count += 1
@@ -962,15 +973,18 @@ def classify(
                             )
                             result.relationship_type = new_type
                             result.confidence = 1.0  # Manual override
+                            was_reviewed = True  # Human edited
+                        elif response.lower() == "a":
+                            was_reviewed = True  # Human reviewed and accepted
 
-                # Store update
+                # Store update (include item_flavor for unique identification)
                 updates.append(
                     (
                         doi,
                         dataset_id,
-                        result.relationship_type,
-                        result.confidence,
-                        result.reasoning,
+                        citation.item_flavor,  # Need this for classifications.json
+                        result,
+                        was_reviewed,
                     )
                 )
 
@@ -990,45 +1004,50 @@ def classify(
         click.echo("\n[DRY RUN] TSV not updated")
         return
 
-    # Update TSV
+    # Update TSV and save detailed results
     if updates:
-        click.echo(f"\nUpdating {tsv_path}...")
+        click.echo("\nSaving detailed results to classifications.json files...")
+        click.echo(f"Updating {tsv_path}...")
 
         # Update citation records
         from citations_collector.models.generated import CitationRelationship
 
         updated_citations = []
-        for doi, item_id, relationship, confidence, reasoning in updates:
+        for doi, item_id, item_flavor, result, was_reviewed in updates:
             citation = citation_lookup.get((doi, item_id))
             if citation:
                 # Update relationship (use enum value)
                 try:
-                    rel_enum = CitationRelationship(relationship)
+                    rel_enum = CitationRelationship(result.relationship_type)
 
-                    # Build comment
-                    comment_parts = []
-                    if citation.citation_comment:
-                        comment_parts.append(citation.citation_comment)
-                    comment_parts.append(
-                        f"[LLM classified: confidence={confidence:.2f}]"
-                    )
-                    if confidence < confidence_threshold:
-                        comment_parts.append(f"Reasoning: {reasoning[:200]}")
-                    new_comment = " ".join(comment_parts)
+                    # Save detailed result to classifications.json
+                    if not dry_run:
+                        storage.add_classification(
+                            doi=doi,
+                            item_id=item_id,
+                            item_flavor=item_flavor,
+                            result=result,
+                            model=model_id,
+                            backend=backend,
+                            mode=classification_mode,
+                        )
 
-                    # Update using model_copy to avoid Pydantic validation issues
+                    # Update citation with classification metadata
                     updated = citation.model_copy(
                         update={
                             "citation_relationship": rel_enum,
                             "citation_relationships": [rel_enum],
-                            "citation_comment": new_comment,
+                            "classification_method": ClassificationMethod.llm,
+                            "classification_model": model_id,
+                            "classification_confidence": result.confidence,
+                            "classification_reviewed": was_reviewed,
                         }
                     )
                     updated_citations.append((doi, item_id, updated))
 
                 except (ValueError, Exception) as e:
                     click.echo(
-                        f"Warning: Failed to update relationship '{relationship}' "
+                        f"Warning: Failed to update relationship '{result.relationship_type}' "
                         f"for {item_id}: {e}",
                         err=True,
                     )
@@ -1042,8 +1061,9 @@ def classify(
                 idx = citations.index(citation)
                 citations[idx] = updated_citation
 
-        # Save
+        # Save TSV
         tsv_io.save_citations(citations, tsv_path)
+        click.echo(f"✓ Saved detailed results for {len(updates)} citations")
         click.echo(f"✓ Updated {len(updates)} citations in {tsv_path}")
 
 
