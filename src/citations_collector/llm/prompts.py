@@ -1,6 +1,7 @@
 """Prompts for LLM-based citation classification."""
 
-CLASSIFICATION_SYSTEM_PROMPT = """You are an expert in scientific citation analysis, specializing in how research papers reference scientific datasets.
+CLASSIFICATION_SYSTEM_PROMPT = """You are an expert in scientific citation analysis, \
+specializing in how research papers reference scientific datasets.
 
 Your task is to classify the relationship between a paper and a dataset it cites.
 
@@ -20,7 +21,8 @@ Citation Relationship Types (CiTO Ontology):
    - Systematic reviews, dataset quality assessments
    - Keywords: evaluated, assessed quality, reviewed, compared datasets
 
-4. **CitesAsEvidence** (cito:citesAsEvidence): Paper uses dataset to validate methods or benchmark algorithms
+4. **CitesAsEvidence** (cito:citesAsEvidence): Paper uses dataset to validate \
+methods or benchmark algorithms
    - Example: "We validated our spike sorting algorithm on DANDI:000003..."
    - Benchmarking, method validation
    - Keywords: validated, benchmarked, tested on, demonstrated on
@@ -47,7 +49,8 @@ Citation Relationship Types (CiTO Ontology):
 Guidelines:
 - Papers can have MULTIPLE relationship types (e.g., both Uses and Reviews)
 - Look for specific verbs: "analyzed", "validated", "combined", "describes", "reviewed"
-- Journal name is a strong signal (Scientific Data → IsDocumentedBy, Nature Methods → CitesAsEvidence)
+- Journal name is a strong signal (Scientific Data → IsDocumentedBy, \
+Nature Methods → CitesAsEvidence)
 - Be conservative: if uncertain, use confidence < 0.7
 - If multiple contexts show different relationships, report the primary one
 

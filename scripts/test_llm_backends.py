@@ -21,8 +21,14 @@ def test_ollama():
 
         # Test classification
         contexts = [
-            "We analyzed neural recordings from the Allen Institute dataset (DANDI:000003) using custom spike sorting algorithms.",
-            "The DANDI:000003 dataset contains high-quality electrophysiological recordings from mouse visual cortex.",
+            (
+                "We analyzed neural recordings from the Allen Institute dataset "
+                "(DANDI:000003) using custom spike sorting algorithms."
+            ),
+            (
+                "The DANDI:000003 dataset contains high-quality electrophysiological "
+                "recordings from mouse visual cortex."
+            ),
         ]
 
         metadata = {
@@ -60,7 +66,10 @@ def test_dartmouth():
         )
 
         contexts = [
-            "We describe a comprehensive dataset of neural recordings (DANDI:000108) collected from mouse visual cortex.",
+            (
+                "We describe a comprehensive dataset of neural recordings "
+                "(DANDI:000108) collected from mouse visual cortex."
+            ),
         ]
 
         metadata = {

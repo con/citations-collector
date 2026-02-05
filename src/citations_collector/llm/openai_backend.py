@@ -43,8 +43,8 @@ class OpenAIBackend(LLMBackend):
         # Import OpenAI client
         try:
             from openai import OpenAI
-        except ImportError:
-            raise ImportError("openai package required. Install with: pip install openai")
+        except ImportError as err:
+            raise ImportError("openai package required. Install with: pip install openai") from err
 
         self.client = OpenAI(
             api_key=self.api_key,

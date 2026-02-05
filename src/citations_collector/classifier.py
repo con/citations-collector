@@ -95,8 +95,7 @@ class CitationClassifier:
         )
 
         logger.info(
-            f"Classification: {result.relationship_type} "
-            f"(confidence: {result.confidence:.2f})"
+            f"Classification: {result.relationship_type} " f"(confidence: {result.confidence:.2f})"
         )
 
         return result
@@ -123,13 +122,9 @@ class CitationClassifier:
 
         # Extract full text
         if pdf_or_html_path.suffix == ".pdf":
-            full_text = extractor.extract_full_text_from_pdf(
-                pdf_or_html_path, max_chars=50000
-            )
+            full_text = extractor.extract_full_text_from_pdf(pdf_or_html_path, max_chars=50000)
         elif pdf_or_html_path.suffix == ".html":
-            full_text = extractor.extract_full_text_from_html(
-                pdf_or_html_path, max_chars=50000
-            )
+            full_text = extractor.extract_full_text_from_html(pdf_or_html_path, max_chars=50000)
         else:
             logger.error(f"Unsupported file type: {pdf_or_html_path.suffix}")
             return []
@@ -185,10 +180,7 @@ class CitationClassifier:
             dataset_id = citation["dataset_id"]
 
             # Collect all context strings
-            contexts = [
-                mention["context"]
-                for mention in citation.get("dataset_mentions", [])
-            ]
+            contexts = [mention["context"] for mention in citation.get("dataset_mentions", [])]
 
             result = self.classify_citation(
                 contexts=contexts,

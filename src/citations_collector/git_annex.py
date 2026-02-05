@@ -13,7 +13,7 @@ class GitAnnexHelper:
     """Helper for git-annex operations."""
 
     @staticmethod
-    def is_git_annex_repo(path: Path = Path.cwd()) -> bool:
+    def is_git_annex_repo(path: Path | None = None) -> bool:
         """Check if current directory is a git-annex repository.
 
         Args:
@@ -22,6 +22,8 @@ class GitAnnexHelper:
         Returns:
             True if git-annex initialized
         """
+        if path is None:
+            path = Path.cwd()
         try:
             result = subprocess.run(
                 ["git", "annex", "version"],

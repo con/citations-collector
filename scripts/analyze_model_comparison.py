@@ -13,8 +13,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-import pandas as pd
-
 
 def load_results(results_dir: Path):
     """Load all model results."""
@@ -80,9 +78,7 @@ def calculate_agreement(matrix):
 
             # Find citations classified by both
             common_citations = [
-                key
-                for key, data in matrix.items()
-                if model1 in data and model2 in data
+                key for key, data in matrix.items() if model1 in data and model2 in data
             ]
 
             if not common_citations:
@@ -90,9 +86,7 @@ def calculate_agreement(matrix):
 
             # Calculate agreement
             agree_count = sum(
-                1
-                for key in common_citations
-                if matrix[key][model1][0] == matrix[key][model2][0]
+                1 for key in common_citations if matrix[key][model1][0] == matrix[key][model2][0]
             )
 
             agreement_rate = agree_count / len(common_citations)
@@ -138,9 +132,7 @@ def generate_report(results_dir: Path, output_file: Path):
         else:
             status = f"{n_classifications} classifications"
 
-        report_lines.append(
-            f"  {model_key:50s} {backend:12s} {model:20s} {mode:6s} {status}"
-        )
+        report_lines.append(f"  {model_key:50s} {backend:12s} {model:20s} {mode:6s} {status}")
 
     report_lines.append("")
 
@@ -182,16 +174,13 @@ def generate_report(results_dir: Path, output_file: Path):
         report_lines.append("Models are sorted by agreement rate.")
         report_lines.append("")
 
-        for (model1, model2), data in sorted(
-            agreement.items(), key=lambda x: -x[1]["rate"]
-        ):
+        for (model1, model2), data in sorted(agreement.items(), key=lambda x: -x[1]["rate"]):
             rate = data["rate"]
             agree = data["agree"]
             total = data["total"]
 
             report_lines.append(
-                f"  {model1:40s} <-> {model2:40s}: "
-                f"{rate:5.1%} ({agree}/{total})"
+                f"  {model1:40s} <-> {model2:40s}: " f"{rate:5.1%} ({agree}/{total})"
             )
         report_lines.append("")
 
@@ -256,9 +245,7 @@ def generate_report(results_dir: Path, output_file: Path):
                 doi, dataset = key.split("|")
                 short_rel = all_results[short_key]["results"][key]["relationship"]
                 full_rel = all_results[full_key]["results"][key]["relationship"]
-                report_lines.append(
-                    f"    {dataset:20s} short={short_rel:20s} full={full_rel:20s}"
-                )
+                report_lines.append(f"    {dataset:20s} short={short_rel:20s} full={full_rel:20s}")
 
         report_lines.append("")
 
@@ -271,8 +258,7 @@ def generate_report(results_dir: Path, output_file: Path):
             continue
 
         confidences = [
-            result["confidence"]
-            for result in all_results[model_key]["results"].values()
+            result["confidence"] for result in all_results[model_key]["results"].values()
         ]
 
         if confidences:
@@ -281,8 +267,7 @@ def generate_report(results_dir: Path, output_file: Path):
             max_conf = max(confidences)
 
             report_lines.append(
-                f"  {model_key:50s} "
-                f"avg={avg_conf:.2f} min={min_conf:.2f} max={max_conf:.2f}"
+                f"  {model_key:50s} " f"avg={avg_conf:.2f} min={min_conf:.2f} max={max_conf:.2f}"
             )
 
     report_lines.append("")
@@ -309,9 +294,9 @@ def generate_report(results_dir: Path, output_file: Path):
         report_lines.append("Citations with most disagreement:")
         report_lines.append("")
 
-        for citation_key in sorted(
-            disagreement_scores, key=disagreement_scores.get, reverse=True
-        )[:10]:
+        for citation_key in sorted(disagreement_scores, key=disagreement_scores.get, reverse=True)[
+            :10
+        ]:
             doi, dataset = citation_key.split("|")
 
             report_lines.append(f"**{dataset}** (DOI: {doi[:40]}...)")
@@ -337,9 +322,7 @@ def generate_report(results_dir: Path, output_file: Path):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Analyze model comparison results"
-    )
+    parser = argparse.ArgumentParser(description="Analyze model comparison results")
     parser.add_argument(
         "--results-dir",
         type=Path,

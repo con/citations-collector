@@ -53,8 +53,7 @@ class ContextExtractor:
             import pdfplumber
         except ImportError as e:
             raise ImportError(
-                "pdfplumber required for PDF extraction. "
-                "Install with: pip install pdfplumber"
+                "pdfplumber required for PDF extraction. " "Install with: pip install pdfplumber"
             ) from e
 
         logger.info(f"Extracting full text from PDF: {pdf_path}")
