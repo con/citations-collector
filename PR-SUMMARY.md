@@ -39,7 +39,10 @@ This PR adds a complete LLM-based citation classification system with multi-mode
 - Schema updates: Added `ClassificationMethod` enum and 4 metadata fields to `CitationRecord`
 
 **Documentation:**
-- 8 comprehensive guides (2500+ lines): workflow, metadata, model comparison, available models, context extraction, setup, dandi-bib integration, automation
+- 8 user-facing guides in `docs/`: CLASSIFICATION-WORKFLOW, CLASSIFICATION-METADATA, AVAILABLE-MODELS, MODEL-COMPARISON, SETUP-LLM, CONTEXT-EXTRACTION, DANDI-BIB-SETUP, AUTOMATION
+- docs/README.md - Documentation index with quick start guide
+- Removed 6 outdated planning/status docs from .specify/specs/ (1,856 lines)
+- Kept 2 historical planning docs for reference (llm-integration-plan, reclassification-mvp)
 
 **Testing:**
 - 8 test/automation scripts for classification, context extraction, backend testing, and model comparison
@@ -98,7 +101,7 @@ python scripts/analyze_model_comparison.py
 - Complete audit trail co-located with paper data
 - Flexible: add new models without losing old results
 
-## Commits (12)
+## Commits (13)
 
 - dbfaa2b Improve context extraction: expand window to capture full paragraphs
 - a85bde3 Add classify command for LLM-based citation relationship classification
@@ -112,6 +115,7 @@ python scripts/analyze_model_comparison.py
 - 1e79859 Add LLM classification metadata to schema
 - 25d73e3 Simplify classification metadata to 4 fields + per-paper storage
 - 511fceb Add classification workflow with per-paper storage
+- 624b2a3 Clean up documentation: remove outdated planning/status docs
 
 ## Ready for Release
 
