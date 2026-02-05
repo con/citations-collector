@@ -117,7 +117,11 @@ def load_citations(path: Path) -> list[CitationRecord]:
                 # Single relationship - still create list for consistency
                 cleaned["citation_relationships"] = [relationships_field]
                 cleaned["citation_relationship"] = relationships_field
-            # If neither field is present, validator will auto-populate from citation_relationship
+            else:
+                # No relationship field - set default for backward compatibility
+                # Use "Cites" as the generic default when unspecified
+                cleaned["citation_relationship"] = "Cites"
+                cleaned["citation_relationships"] = ["Cites"]
 
             # Create CitationRecord, only including fields that are in the model
             citation = CitationRecord(**cleaned)  # type: ignore[arg-type]
