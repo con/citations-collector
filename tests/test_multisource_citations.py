@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -259,7 +260,7 @@ def test_tsv_roundtrip_multisource(tmp_path: Path) -> None:
     assert set(citation.citation_sources) == {"crossref", "datacite", "openalex"}
 
 
-def _rec(source: str, **kwargs) -> CitationRecord:
+def _rec(source: str, **kwargs: Any) -> CitationRecord:
     defaults = {
         "item_id": "dandi.000003",
         "item_flavor": "0.210812.1448",
@@ -291,6 +292,7 @@ def test_deduplicate_prefers_trusted_source_metadata() -> None:
         assert ranks[("dandi.000003", "0.210812.1448", "10.1234/test")] == {
             "citation_authors": 0,
             "citation_title": 0,
+            "citation_type": 1,
         }
 
 

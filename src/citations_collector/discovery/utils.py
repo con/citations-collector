@@ -8,16 +8,8 @@ from urllib3.util.retry import Retry
 
 from citations_collector.models import CitationRecord
 
-# Canonical precedence of discovery sources, used to pick metadata
-# deterministically when the same citation is found by several sources.
-# Registry-backed sources (metadata from doi.org content negotiation, i.e.
-# CrossRef/DataCite records) come first; OpenAlex normalizes names (drops
-# diacritics, abbreviates) so it only fills gaps.
-SOURCE_PRECEDENCE: tuple[str, ...] = ("crossref", "datacite", "opencitations", "openalex")
-
-# Metadata trust rank per source (lower is better).  Registry-backed sources
-# share a rank since they return the same doi.org metadata.  Unknown sources
-# (e.g. "manual") get the worst rank so they never block updates.
+# Metadata trust rank (lower is better): registry-backed sources return the same
+# doi.org metadata; OpenAlex normalizes names (drops diacritics), so ranks below.
 SOURCE_RANK: dict[str, int] = {
     "crossref": 0,
     "datacite": 0,
@@ -26,12 +18,12 @@ SOURCE_RANK: dict[str, int] = {
 }
 UNKNOWN_SOURCE_RANK = max(SOURCE_RANK.values()) + 1
 
-# Metadata fields merged across sources
 METADATA_FIELDS: tuple[str, ...] = (
     "citation_title",
     "citation_authors",
     "citation_year",
     "citation_journal",
+    "citation_type",
 )
 
 CitationKey = tuple[str, str, str | None]
@@ -39,13 +31,14 @@ CitationKey = tuple[str, str, str | None]
 
 def source_rank(source: str | None) -> int:
     """Return metadata trust rank of a source (lower is more trusted)."""
-    return SOURCE_RANK.get(str(source), UNKNOWN_SOURCE_RANK) if source else UNKNOWN_SOURCE_RANK
+    return SOURCE_RANK.get(str(source), UNKNOWN_SOURCE_RANK)
 
 
-def sort_sources(sources: list[str]) -> list[str]:
-    """Order sources canonically (by SOURCE_PRECEDENCE, unknown ones last, stable)."""
-    order = {s: i for i, s in enumerate(SOURCE_PRECEDENCE)}
-    return sorted(dict.fromkeys(sources), key=lambda s: order.get(s, len(order)))
+class _CappedRetry(Retry):
+    """Retry that caps server-requested Retry-After waits."""
+
+    def parse_retry_after(self, retry_after: str) -> float:
+        return min(super().parse_retry_after(retry_after), 120)
 
 
 def make_retrying_session(
@@ -53,24 +46,16 @@ def make_retrying_session(
     backoff_factor: float = 2.0,
     user_agent: str | None = None,
 ) -> requests.Session:
-    """
-    Create a requests Session that retries rate-limited and failed requests.
-
-    Retries on 429 and 5xx with exponential backoff, honoring the server's
-    Retry-After header.  Without it, a 429 from DataCite/OpenAlex silently
-    drops that source for the ref, which makes results (and the metadata that
-    wins deduplication) depend on the day's rate limiting.
-    """
+    """Create a Session retrying 429/5xx responses with backoff (honoring Retry-After)."""
     session = requests.Session()
     if user_agent:
         session.headers["User-Agent"] = user_agent
-    retry = Retry(
+    retry = _CappedRetry(
         total=total,
+        read=False,  # do not multiply slow queries' read timeouts
         backoff_factor=backoff_factor,
-        backoff_max=120,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["GET", "HEAD"],
-        respect_retry_after_header=True,
     )
     adapter = HTTPAdapter(max_retries=retry)
     session.mount("http://", adapter)
@@ -98,16 +83,13 @@ def deduplicate_citations(
     """
     Deduplicate citations by unique key (item_id, item_flavor, citation_doi).
 
-    When duplicates are found across sources, all sources are collected in
-    ``citation_sources`` (in canonical SOURCE_PRECEDENCE order) and each
-    metadata field is taken from the highest-precedence source providing a
-    value.  The result therefore does not depend on the order in which
-    sources answered or on which of them happened to fail.
+    Sources are collected in citation_sources, and each metadata field is taken
+    from the most trusted source providing it (see SOURCE_RANK).
 
     Args:
         citations: List of citation records
-        field_ranks: Optional dict filled with, per citation key, the source
-            rank (see ``source_rank``) that provided each metadata field.
+        field_ranks: Optional dict to fill with, per citation key, the rank of
+            the source that provided each metadata field.
 
     Returns:
         Deduplicated list with sources merged
@@ -119,12 +101,9 @@ def deduplicate_citations(
         key = (citation.item_id, citation.item_flavor, citation.citation_doi)
         grouped.setdefault(key, []).append(citation)
 
-    order = {s: i for i, s in enumerate(SOURCE_PRECEDENCE)}
-
     unique = []
     for key, group in grouped.items():
-        # Stable sort by canonical source precedence
-        group = sorted(group, key=lambda c: order.get(str(c.citation_source), len(order)))
+        group = sorted(group, key=lambda c: source_rank(c.citation_source))
         citation = group[0]
 
         ranks: dict[str, int] = {}
@@ -132,17 +111,11 @@ def deduplicate_citations(
             for c in group:
                 value = getattr(c, field)
                 if value:
-                    if value != getattr(citation, field):
-                        setattr(citation, field, value)
+                    setattr(citation, field, value)
                     ranks[field] = source_rank(c.citation_source)
                     break
-        # Fill other empty fields (e.g. citation_type from OpenAlex)
-        for c in group[1:]:
-            for field in ("citation_type", "citation_pmid", "citation_arxiv", "citation_url"):
-                if not getattr(citation, field) and getattr(c, field):
-                    setattr(citation, field, getattr(c, field))
 
-        sources = sort_sources([str(c.citation_source) for c in group if c.citation_source])
+        sources = list(dict.fromkeys(str(c.citation_source) for c in group if c.citation_source))
         if sources:
             citation.citation_sources = sources  # type: ignore[assignment]
             # Keep citation_source set to first source (required field, backward compat)

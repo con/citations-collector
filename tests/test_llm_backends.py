@@ -65,6 +65,18 @@ class TestCreateBackend:
             base_url="https://custom.url",
         )
 
+    @patch("citations_collector.llm.factory.OpenAIBackend")
+    def test_dartmouth_uses_dartmouth_api_token(
+        self, mock_cls: MagicMock, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("DARTMOUTH_API_TOKEN", "dtoken")
+        create_backend("dartmouth", model="gpt-4")
+        mock_cls.assert_called_once_with(
+            model="gpt-4",
+            api_key="dtoken",
+            base_url="https://chat.dartmouth.edu/api",
+        )
+
     def test_unknown_backend_raises(self) -> None:
         with pytest.raises(ValueError, match="Unknown backend type"):
             create_backend("nonexistent")  # type: ignore[arg-type]

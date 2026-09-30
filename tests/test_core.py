@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import responses
 
 from citations_collector.core import CitationCollector
+from citations_collector.models import CitationRecord
 
 
 @pytest.mark.ai_generated
@@ -161,9 +163,7 @@ def test_save_workflow(tmp_path: Path, collections_dir: Path) -> None:
     assert len(reloaded.citations) == 1
 
 
-def _citation(sources: list[str], **kwargs):  # type: ignore[no-untyped-def]
-    from citations_collector.models import CitationRecord
-
+def _citation(sources: list[str], **kwargs: Any) -> CitationRecord:
     defaults = {
         "item_id": "test-item",
         "item_flavor": "1.0.0",
