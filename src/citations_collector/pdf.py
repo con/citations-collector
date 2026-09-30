@@ -120,11 +120,14 @@ class PDFAcquirer:
         full_path = self.output_dir / pdf_path
         html_path = full_path.with_suffix(".html")
 
-        if full_path.exists():
+        # is_symlink(): a git-annex file whose content is not present locally is
+        # a dangling symlink (exists() is False) -- it is already acquired, and
+        # writing through it would fail with FileNotFoundError.
+        if full_path.exists() or full_path.is_symlink():
             citation.pdf_path = str(full_path)
             logger.debug(f"PDF already exists: {full_path}")
             return False
-        if html_path.exists():
+        if html_path.exists() or html_path.is_symlink():
             citation.pdf_path = str(html_path)
             logger.debug(f"HTML already exists: {html_path}")
             return False

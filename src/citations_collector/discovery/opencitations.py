@@ -10,6 +10,7 @@ from typing import cast
 import requests
 
 from citations_collector.discovery.base import AbstractDiscoverer
+from citations_collector.discovery.utils import make_retrying_session
 from citations_collector.models import CitationRecord, CitationSource, ItemRef
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class OpenCitationsDiscoverer(AbstractDiscoverer):
 
     def __init__(self) -> None:
         """Initialize OpenCitations discoverer."""
-        self.session = requests.Session()
+        self.session = make_retrying_session()
 
     def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """

@@ -14,10 +14,9 @@ from datetime import datetime
 from typing import Any, cast
 
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 from citations_collector.discovery.base import AbstractDiscoverer
+from citations_collector.discovery.utils import make_retrying_session
 from citations_collector.models import CitationRecord, CitationSource, ItemRef
 
 logger = logging.getLogger(__name__)
@@ -49,20 +48,11 @@ class CrossRefDiscoverer(AbstractDiscoverer):
             email: Email for polite pool (better rate limits)
         """
         self.email = email
-        self.session = requests.Session()
-        if email:
-            self.session.headers["User-Agent"] = f"citations-collector (mailto:{email})"
-
-        # Add retry logic for timeouts and server errors
-        retry_strategy = Retry(
+        # Retry on rate limiting (429) and server errors
+        self.session = make_retrying_session(
             total=3,
-            backoff_factor=2,  # 2s, 4s, 8s
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET", "HEAD"],
+            user_agent=f"citations-collector (mailto:{email})" if email else None,
         )
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        self.session.mount("http://", adapter)
-        self.session.mount("https://", adapter)
 
     def discover(self, item_ref: ItemRef, since: datetime | None = None) -> list[CitationRecord]:
         """

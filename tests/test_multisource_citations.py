@@ -257,3 +257,51 @@ def test_tsv_roundtrip_multisource(tmp_path: Path) -> None:
     # Verify sources preserved
     assert citation.citation_sources is not None
     assert set(citation.citation_sources) == {"crossref", "datacite", "openalex"}
+
+
+def _rec(source: str, **kwargs) -> CitationRecord:
+    defaults = {
+        "item_id": "dandi.000003",
+        "item_flavor": "0.210812.1448",
+        "citation_doi": "10.1234/test",
+        "citation_relationship": "Cites",
+        "citation_source": source,
+        "citation_status": "active",
+    }
+    defaults.update(kwargs)
+    return CitationRecord(**defaults)
+
+
+@pytest.mark.ai_generated
+def test_deduplicate_prefers_trusted_source_metadata() -> None:
+    """Metadata and source order do not depend on the order sources answered."""
+    openalex = {"citation_authors": "Balint Kurgyis", "citation_type": "Publication"}
+    datacite = {"citation_authors": "Bálint Kurgyis", "citation_title": "Title"}
+    for order in (
+        [("openalex", openalex), ("datacite", datacite)],
+        [("datacite", datacite), ("openalex", openalex)],
+    ):
+        ranks: dict = {}
+        (c,) = deduplicate_citations([_rec(s, **kw) for s, kw in order], field_ranks=ranks)
+        assert c.citation_authors == "Bálint Kurgyis"
+        assert c.citation_title == "Title"
+        assert c.citation_type == "Publication"
+        assert c.citation_sources == ["datacite", "openalex"]
+        assert c.citation_source == "datacite"
+        assert ranks[("dandi.000003", "0.210812.1448", "10.1234/test")] == {
+            "citation_authors": 0,
+            "citation_title": 0,
+        }
+
+
+@pytest.mark.ai_generated
+def test_deduplicate_fills_missing_fields_from_less_trusted_source() -> None:
+    """If the registry metadata fetch failed, OpenAlex fills the gap."""
+    ranks: dict = {}
+    (c,) = deduplicate_citations(
+        [_rec("datacite"), _rec("openalex", citation_authors="A B", citation_year=2025)],
+        field_ranks=ranks,
+    )
+    assert c.citation_authors == "A B"
+    assert c.citation_year == 2025
+    assert set(ranks[("dandi.000003", "0.210812.1448", "10.1234/test")].values()) == {1}

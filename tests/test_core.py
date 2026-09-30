@@ -159,3 +159,56 @@ def test_save_workflow(tmp_path: Path, collections_dir: Path) -> None:
     reloaded = CitationCollector.from_yaml(yaml_path)
     reloaded.load_existing_citations(tsv_path)
     assert len(reloaded.citations) == 1
+
+
+def _citation(sources: list[str], **kwargs):  # type: ignore[no-untyped-def]
+    from citations_collector.models import CitationRecord
+
+    defaults = {
+        "item_id": "test-item",
+        "item_flavor": "1.0.0",
+        "citation_doi": "10.1234/paper",
+        "citation_relationship": "Cites",
+        "citation_source": sources[0],
+        "citation_sources": sources,
+        "citation_status": "active",
+    }
+    defaults.update(kwargs)
+    return CitationRecord(**defaults)
+
+
+@pytest.mark.ai_generated
+def test_merge_citations_less_trusted_source_does_not_overwrite(collections_dir: Path) -> None:
+    """OpenAlex-only rediscovery (e.g. DataCite rate-limited) keeps registry metadata."""
+    collector = CitationCollector.from_yaml(collections_dir / "simple.yaml")
+    collector.citations = [
+        _citation(["datacite", "openalex"], citation_authors="Bálint Kurgyis", citation_year=2025)
+    ]
+    new = _citation(
+        ["openalex"], citation_authors="Balint Kurgyis", citation_journal="Nature Neuroscience"
+    )
+    ranks = {
+        ("test-item", "1.0.0", "10.1234/paper"): {"citation_authors": 1, "citation_journal": 1}
+    }
+    collector.merge_citations([new], field_ranks=ranks)
+
+    (c,) = collector.citations
+    assert c.citation_authors == "Bálint Kurgyis"
+    # Empty fields are still filled
+    assert c.citation_journal == "Nature Neuroscience"
+    assert c.citation_sources == ["datacite", "openalex"]
+
+
+@pytest.mark.ai_generated
+def test_merge_citations_updates_sources_and_trusted_metadata(collections_dir: Path) -> None:
+    """Sources found in this run are recorded; registry metadata replaces OpenAlex's."""
+    collector = CitationCollector.from_yaml(collections_dir / "simple.yaml")
+    collector.citations = [_citation(["openalex"], citation_authors="Balint Kurgyis")]
+    new = _citation(["datacite", "openalex"], citation_authors="Bálint Kurgyis")
+    ranks = {("test-item", "1.0.0", "10.1234/paper"): {"citation_authors": 0}}
+    collector.merge_citations([new], field_ranks=ranks)
+
+    (c,) = collector.citations
+    assert c.citation_authors == "Bálint Kurgyis"
+    assert c.citation_sources == ["datacite", "openalex"]
+    assert c.citation_source == "datacite"
