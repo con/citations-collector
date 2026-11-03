@@ -11,6 +11,7 @@ from typing import Any
 import requests
 
 from citations_collector.discovery.base import AbstractDiscoverer
+from citations_collector.discovery.utils import make_retrying_session
 from citations_collector.models import CitationRecord, CitationSource, ItemRef
 
 logger = logging.getLogger(__name__)
@@ -44,13 +45,11 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
         """
         self.email = email
         self.api_key = api_key
-        self.session = requests.Session()
-
         # Set User-Agent with mailto for polite pool
         user_agent = "citations-collector"
         if email:
             user_agent += f" (mailto:{email})"
-        self.session.headers["User-Agent"] = user_agent
+        self.session = make_retrying_session(user_agent=user_agent)
 
         self._last_request_time = 0.0
 

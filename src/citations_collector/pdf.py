@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import time
 from collections.abc import Mapping
@@ -120,11 +121,12 @@ class PDFAcquirer:
         full_path = self.output_dir / pdf_path
         html_path = full_path.with_suffix(".html")
 
-        if full_path.exists():
+        # lexists: a git-annex file without local content is a dangling symlink
+        if os.path.lexists(full_path):
             citation.pdf_path = str(full_path)
             logger.debug(f"PDF already exists: {full_path}")
             return False
-        if html_path.exists():
+        if os.path.lexists(html_path):
             citation.pdf_path = str(html_path)
             logger.debug(f"HTML already exists: {html_path}")
             return False
@@ -166,7 +168,7 @@ class PDFAcquirer:
                 continue
             seen_dois.add(citation.citation_doi)
 
-            if citation.pdf_path and Path(citation.pdf_path).exists():
+            if citation.pdf_path and os.path.lexists(citation.pdf_path):
                 counts["skipped"] += 1
                 continue
 
