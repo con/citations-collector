@@ -57,7 +57,7 @@ class ConfiguredBaseModel(BaseModel):
                     setattr(_instance, field, None)
         else:
             _instance = self
-        return handler(_instance, info)
+        return handler(_instance)
 
 
 
