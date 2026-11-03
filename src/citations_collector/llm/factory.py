@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Literal
 
 from .base import LLMBackend
@@ -50,6 +51,9 @@ def create_backend(
         # Default base_url for Dartmouth unless overridden
         if "base_url" not in kwargs:
             kwargs["base_url"] = "https://chat.dartmouth.edu/api"
+        # DARTMOUTH_API_TOKEN if no explicit key; if still None, OpenAIBackend
+        # falls back to OPENAI_API_KEY.
+        kwargs["api_key"] = kwargs.get("api_key") or os.getenv("DARTMOUTH_API_TOKEN")
         return OpenAIBackend(**kwargs)
     else:
         raise ValueError(
