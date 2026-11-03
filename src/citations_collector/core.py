@@ -16,7 +16,13 @@ from citations_collector.discovery import (
     OpenAlexDiscoverer,
     OpenCitationsDiscoverer,
 )
-from citations_collector.discovery.utils import deduplicate_citations
+from citations_collector.discovery.utils import (
+    METADATA_FIELDS,
+    UNKNOWN_SOURCE_RANK,
+    CitationKey,
+    deduplicate_citations,
+    source_rank,
+)
 from citations_collector.models import CitationRecord, Collection
 from citations_collector.persistence import tsv_io, yaml_io
 
@@ -435,12 +441,13 @@ class CitationCollector:
                             pbar.update(1)
 
         # Deduplicate and merge with existing
-        unique_citations = deduplicate_citations(all_citations)
+        field_ranks: dict[CitationKey, dict[str, int]] = {}
+        unique_citations = deduplicate_citations(all_citations, field_ranks=field_ranks)
 
         # Report new citations grouped by DOI with sources
         self._report_discoveries(unique_citations)
 
-        self.merge_citations(unique_citations)
+        self.merge_citations(unique_citations, field_ranks=field_ranks)
 
     def load_existing_citations(self, path: Path) -> None:
         """
@@ -451,14 +458,24 @@ class CitationCollector:
         """
         self.citations = tsv_io.load_citations(path)
 
-    def merge_citations(self, new_citations: list[CitationRecord]) -> None:
+    def merge_citations(
+        self,
+        new_citations: list[CitationRecord],
+        field_ranks: dict[CitationKey, dict[str, int]] | None = None,
+    ) -> None:
         """
         Merge new citations with existing, preserve curation status.
 
         Uses unique key (item_id, item_flavor, citation_doi).
 
+        Non-empty fields are not overwritten by values from less trusted sources;
+        newly seen sources are added to citation_sources.
+
         Args:
             new_citations: New citations to merge
+            field_ranks: Per citation key, the source rank that provided each
+                metadata field (as filled by ``deduplicate_citations``).  If
+                not given, the rank of the citation's primary source is used.
         """
         # Build index of existing citations
         existing_index = {(c.item_id, c.item_flavor, c.citation_doi): c for c in self.citations}
@@ -470,18 +487,29 @@ class CitationCollector:
             if key in existing_index:
                 # Citation exists - preserve curation fields
                 existing = existing_index[key]
+                old_sources = list(existing.citation_sources or [existing.citation_source])
+                existing_rank = min(map(source_rank, old_sources), default=UNKNOWN_SOURCE_RANK)
                 # Keep existing curation status, comment, etc.
                 # Only update metadata if not curated
                 if existing.citation_status == "active" and not existing.citation_comment:
-                    # Update title, authors, etc. from new discovery
-                    if new_citation.citation_title:
-                        existing.citation_title = new_citation.citation_title
-                    if new_citation.citation_authors:
-                        existing.citation_authors = new_citation.citation_authors
-                    if new_citation.citation_year:
-                        existing.citation_year = new_citation.citation_year
-                    if new_citation.citation_journal:
-                        existing.citation_journal = new_citation.citation_journal
+                    ranks = (field_ranks or {}).get(key, {})
+                    default_rank = source_rank(new_citation.citation_source)
+                    for field in METADATA_FIELDS:
+                        old_value = getattr(existing, field)
+                        new_value = getattr(new_citation, field)
+                        if (
+                            new_value
+                            and new_value != old_value
+                            and (not old_value or ranks.get(field, default_rank) <= existing_rank)
+                        ):
+                            setattr(existing, field, new_value)
+
+                # Record sources that (also) found this citation
+                new_sources = list(new_citation.citation_sources or [])
+                if not set(new_sources) <= set(old_sources):
+                    sources = sorted(dict.fromkeys(old_sources + new_sources), key=source_rank)
+                    existing.citation_sources = sources  # type: ignore[assignment]
+                    existing.citation_source = sources[0]  # type: ignore[assignment]
             else:
                 # New citation - add it
                 self.citations.append(new_citation)

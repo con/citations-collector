@@ -88,9 +88,9 @@ All backends return a `ClassificationResult`:
 @dataclass
 class ClassificationResult:
     relationship_type: str  # "Uses", "IsDocumentedBy", etc.
-    confidence: float       # 0.0-1.0
-    reasoning: str          # LLM explanation
-    context_used: list[str] # Original contexts
+    confidence: float  # 0.0-1.0
+    reasoning: str  # LLM explanation
+    context_used: list[str]  # Original contexts
 ```
 
 ## Relationship Types

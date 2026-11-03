@@ -343,3 +343,13 @@ def test_datacite_non_doi_ref() -> None:
     # Should return empty list and log warning
     citations = discoverer.discover(item_ref)
     assert citations == []
+
+
+@pytest.mark.ai_generated
+def test_retrying_session_caps_retry_after() -> None:
+    """A huge server-requested Retry-After is capped so it cannot stall a run."""
+    from citations_collector.discovery.utils import make_retrying_session
+
+    retry = make_retrying_session().get_adapter("https://example.org").max_retries
+    assert retry.parse_retry_after("9999") == 60
+    assert retry.parse_retry_after("5") == 5

@@ -164,3 +164,43 @@ def test_fetch_bibtex(tmp_path: Path) -> None:
 
     assert dest.exists()
     assert dest.read_text() == bibtex_content
+
+
+@pytest.mark.ai_generated
+@pytest.mark.parametrize("name", ["article.pdf", "article.html"])
+def test_acquire_skips_dangling_annex_symlink(tmp_path: Path, name: str) -> None:
+    """A git-annex file without local content (dangling symlink) is not re-downloaded."""
+    oa_result = UnpaywallResult(
+        doi="10.1234/test",
+        is_oa=True,
+        oa_status="gold",
+        best_oa_url="https://example.com/paper.pdf",
+        license="cc-by",
+    )
+    dest = tmp_path / "10.1234" / "test" / name
+    dest.parent.mkdir(parents=True)
+    dest.symlink_to("../../.git/annex/objects/XX/YY/MD5E-s1--abc/MD5E-s1--abc")
+    assert not dest.exists()
+
+    acquirer = PDFAcquirer(output_dir=tmp_path)
+    acquirer.unpaywall = type("Mock", (), {"lookup": lambda self, doi: oa_result})()
+    with patch.object(PDFAcquirer, "_download") as download:
+        citation = _make_citation()
+        result = acquirer.acquire_for_citation(citation)
+
+    download.assert_not_called()
+    assert result is False
+    assert citation.pdf_path == str(dest)
+
+
+@pytest.mark.ai_generated
+def test_acquire_all_skips_dangling_annex_symlink(tmp_path: Path) -> None:
+    """acquire_all skips a recorded pdf_path that is a dangling git-annex symlink."""
+    dest = tmp_path / "article.pdf"
+    dest.symlink_to("../.git/annex/objects/XX/YY/MD5E-s1--abc/MD5E-s1--abc")
+    acquirer = PDFAcquirer(output_dir=tmp_path)
+    with patch.object(PDFAcquirer, "acquire_for_citation") as acquire:
+        counts = acquirer.acquire_all([_make_citation(pdf_path=str(dest))])
+
+    acquire.assert_not_called()
+    assert counts["skipped"] == 1
