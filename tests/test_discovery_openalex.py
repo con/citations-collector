@@ -332,3 +332,33 @@ def test_openalex_rate_limiting(monkeypatch: pytest.MonkeyPatch) -> None:
     # Should have slept for remaining time (0.1 - 0.05 = 0.05)
     assert len(sleep_calls) == 1
     assert sleep_calls[0] >= 0.04  # Allow small floating point error
+
+
+@pytest.mark.ai_generated
+@responses.activate
+def test_openalex_sends_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The API key (argument or OPENALEX_API_KEY) goes on every request."""
+    monkeypatch.setenv("OPENALEX_API_KEY", "from-env")
+    _mock_doi_resolution("10.12345/example-doi", "W123456789")
+    responses.add(
+        responses.GET,
+        "https://api.openalex.org/works",
+        json={"results": [], "meta": {"next_cursor": None}},
+        status=200,
+    )
+    ref = ItemRef(ref_type="doi", ref_value="10.12345/example-doi")
+
+    OpenAlexDiscoverer(email="test@example.com").discover(ref)
+    resolve, works = responses.calls
+    for call in (resolve, works):
+        assert call.request.params["api_key"] == "from-env"
+        assert call.request.params["mailto"] == "test@example.com"
+
+    responses.calls.reset()
+    OpenAlexDiscoverer(api_key="explicit").discover(ref)
+    assert all(c.request.params["api_key"] == "explicit" for c in responses.calls)
+
+    monkeypatch.delenv("OPENALEX_API_KEY")
+    responses.calls.reset()
+    OpenAlexDiscoverer().discover(ref)
+    assert all("api_key" not in c.request.params for c in responses.calls)

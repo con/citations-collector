@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from datetime import datetime
@@ -41,10 +42,11 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
 
         Args:
             email: Email for polite pool (adds to User-Agent)
-            api_key: Optional API key for higher rate limits
+            api_key: OpenAlex API key; defaults to the OPENALEX_API_KEY environment
+                variable.  OpenAlex requires a (free) key since February 2026.
         """
         self.email = email
-        self.api_key = api_key
+        self.api_key = api_key or os.environ.get("OPENALEX_API_KEY") or None
         # Set User-Agent with mailto for polite pool
         user_agent = "citations-collector"
         if email:
@@ -90,8 +92,7 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
                 "cursor": cursor,
             }
 
-            if self.email:
-                params["mailto"] = self.email
+            params.update(self._auth_params())
 
             # Add date filter if provided
             if since:
@@ -127,6 +128,15 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
 
         return citations
 
+    def _auth_params(self) -> dict[str, str]:
+        """Query parameters identifying us to OpenAlex (polite pool, API key)."""
+        params = {}
+        if self.email:
+            params["mailto"] = self.email
+        if self.api_key:
+            params["api_key"] = self.api_key
+        return params
+
     def _resolve_doi_to_id(self, doi: str) -> str | None:
         """
         Resolve a DOI to its OpenAlex ID.
@@ -142,6 +152,7 @@ class OpenAlexDiscoverer(AbstractDiscoverer):
         try:
             response = self.session.get(
                 f"{self.BASE_URL}/works/https://doi.org/{doi}",
+                params=self._auth_params() or None,
                 timeout=30,
             )
             response.raise_for_status()
